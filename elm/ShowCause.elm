@@ -26,6 +26,7 @@ visualize v =
         , move (10, -160) (toForm (anycause ["rain"] ["wet"]))
         , move (300, -130) (toForm (anycause ["sprinklers", "rain"] ["wet"]))
         , move (-50, 0) (toForm (anycause ["gravity"] ["falling"]))
+        , move (350, 100) (toForm population)
         ]
 
 node : Color -> String -> Element
@@ -55,6 +56,14 @@ anycause causes effects =
             ]
     in
         color blue (container (10+maxw) (10+2*height) middle lay)
+
+population : Element
+population =
+    let tag = node blue "eyecolor"
+        (w,h) = sizeOf tag
+        element = color brown (container (10+w) (10+h) middle tag)
+    in
+        element
 
 main : Signal Element
 main = lift step events
