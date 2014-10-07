@@ -9,6 +9,10 @@ import qualified Network.WebSockets as WS
 import Control.Concurrent
 
 import qualified Data.ByteString.Char8 as BSC
+import Data.Text (Text)
+import           Data.Aeson                          (encode)
+import Data.Monoid
+--import qualified Data.Text as T
 
 import Population ()
 
@@ -21,10 +25,11 @@ config = setAccessLog ConfigNoLog (setErrorLog ConfigNoLog defaultConfig)
 main :: IO ()
 main =
     httpServe (setPort 8000 config) $
-        site <|>
         route
             [ ("socket", socket)
             ]
+        <|>
+        site
 
 socket :: Snap ()
 socket = WSS.runWebSocketsSnap wsApp
@@ -32,6 +37,8 @@ socket = WSS.runWebSocketsSnap wsApp
 wsApp :: WS.ServerApp
 wsApp pendingConnection = do
     connection <- WS.acceptRequest pendingConnection
+    msg <- WS.receiveData connection
+    WS.sendTextData connection $ encode $ ("Hi there" :: Text) <> msg
     keepAlive connection
 
 keepAlive :: WS.Connection -> IO ()

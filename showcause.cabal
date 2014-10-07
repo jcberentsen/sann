@@ -26,6 +26,8 @@ executable showcause
     , snap
     , websockets-snap
     , websockets
+    , aeson
+    , text
     , bytestring
 
     , Elm == 0.13
