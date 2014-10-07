@@ -3,6 +3,7 @@ import Debug (watch)
 import WebSocket (connect)
 import Json
 import Maybe
+import String
 
 eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
 
@@ -22,22 +23,38 @@ visualize v =
         [ toForm ignorant
         , move (100,0) (toForm fact)
         , move (280, 10) (toForm counterfact)
-        , move (10, -160) (toForm cause)
+        , move (10, -160) (toForm (anycause ["rain"] ["wet"]))
+        , move (300, -130) (toForm (anycause ["sprinklers", "rain"] ["wet"]))
+        , move (-50, 0) (toForm (anycause ["gravity"] ["falling"]))
         ]
 
+node : Color -> String -> Element
+node c name =
+    let el = plainText name
+    in
+        color c (container (10 + widthOf el) 20 middle el)
+
 ignorant : Element
-ignorant = color grey (container 20 20 middle (plainText "?"))
+ignorant = node grey "?"
 
 fact : Element
-fact = color green (container 60 30 middle (plainText "rain!"))
+fact = node green "rain!"
 
 counterfact : Element
-counterfact = color red (container 160 30 middle (plainText "no sprinklers!"))
+counterfact = node red "no sprinklers!"
 
-cause : Element
-cause = flow down
-    [ color yellow (container 60 30 middle (plainText "rain?"))
-    , color orange (container 60 30 middle (plainText "wet?")) ]
+anycause : [String] -> [String] -> Element
+anycause causes effects =
+    let causes' = flow right (map (node yellow) causes)
+        effects' = flow right (map (node orange) effects)
+        maxw = max (widthOf causes') (widthOf effects')
+        height = heightOf causes'
+        lay = flow down
+            [ container maxw height middle causes'
+            , container maxw height middle effects'
+            ]
+    in
+        color blue (container (10+maxw) (10+2*height) middle lay)
 
 main : Signal Element
 main = lift step events
