@@ -21,9 +21,10 @@ config = setAccessLog ConfigNoLog (setErrorLog ConfigNoLog defaultConfig)
 main :: IO ()
 main =
     httpServe (setPort 8000 config) $
-            route
-                [ ("socket", socket)
-                ]
+        site <|>
+        route
+            [ ("socket", socket)
+            ]
 
 socket :: Snap ()
 socket = WSS.runWebSocketsSnap wsApp
