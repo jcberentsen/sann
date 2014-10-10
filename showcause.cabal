@@ -21,7 +21,7 @@ executable showcause
   -- other-modules:       
   -- other-extensions:    
   build-depends:
-      base >=4.6 && <4.7
+      base
     , causality
     , snap
     , websockets-snap
