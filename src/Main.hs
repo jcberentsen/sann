@@ -11,10 +11,14 @@ import Control.Concurrent
 import qualified Data.ByteString.Char8 as BSC
 import Data.Text (Text)
 import           Data.Aeson                          (encode)
-import Data.Monoid
+--import Data.Monoid
 --import qualified Data.Text as T
 
 import Population ()
+import Model
+
+model :: CausalModel Text Bool
+model = Ignorance
 
 site :: Snap ()
 site = writeText "Hello!"
@@ -37,8 +41,9 @@ socket = WSS.runWebSocketsSnap wsApp
 wsApp :: WS.ServerApp
 wsApp pendingConnection = do
     connection <- WS.acceptRequest pendingConnection
-    msg <- WS.receiveData connection
-    WS.sendTextData connection $ encode $ ("Hi there" :: Text) <> msg
+    -- _msg <- WS.receiveData connection
+    WS.sendTextData connection $ encode $ model
+    --WS.sendTextData connection $ encode $ ("Hi there" :: Text) <> msg
     keepAlive connection
 
 keepAlive :: WS.Connection -> IO ()

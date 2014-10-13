@@ -20,6 +20,14 @@ step msg = msg |> Json.fromString |> (watch "msg") |> visualize
 visualize : Maybe Json.Value -> Element
 visualize v =
     collage 800 800
+        [toForm (Maybe.maybe ignorant render v)]
+
+render : Json.Value -> Element
+render v = ignorant
+
+sketch : Maybe Json.Value -> Element
+sketch v =
+    collage 800 800
         [ toForm ignorant
         , move (100,0) (toForm fact)
         , move (280, 10) (toForm counterfact)
