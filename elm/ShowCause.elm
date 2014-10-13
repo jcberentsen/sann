@@ -23,36 +23,45 @@ visualize v =
     collage 800 800
         [toForm (Maybe.maybe ignorant render v)]
 
-data Evidence = Evidence String Float
+data Evidence = Evidence String Bool
 data Model = Ignorant
-           | AnyCause [Evidence] [Evidence]
+           | Causally Evidence Evidence
+           | AnyCause [Evidence] Evidence
 
 parseModel : Json.Value -> Maybe Model
 parseModel v = case v of
     Json.Object dict -> parseModelFromDict dict
     _ -> Just Ignorant
 
-evidenceFromArray : Json.Value -> [Evidence]
-evidenceFromArray _ = [Evidence "rain" 1]
---evidenceFromValue (Json.Array [e, v]) = Evidence "rain" 1
+evidenceFromArray : Json.Value -> Evidence
+evidenceFromArray v = case v of
+    (Json.Array [Json.String name, Json.Boolean v]) -> Evidence name v
+    _ -> Evidence "" False
 
 parseModelFromDict : Dict.Dict String Json.Value -> Maybe Model
 parseModelFromDict dict = case Dict.get "tag" dict of
     Just (Json.String "Causally") ->
-        let causers = Maybe.maybe Json.Null (\a->a) (Dict.get "_causer" dict)
-            causes = evidenceFromArray causers
+        let cause_array = Maybe.maybe Json.Null (\a->a) (Dict.get "_causer" dict)
+            cause = evidenceFromArray cause_array
+            effect_array = Maybe.maybe Json.Null (\a->a) (Dict.get "_effect" dict)
+            effect = evidenceFromArray effect_array
         in
-        Just (AnyCause causes [])
+        Just (Causally cause effect)
+    Just (Json.String "AnyCause") ->
+        let causes_array = Maybe.maybe Json.Null (\a->a) (Dict.get "_causes" dict)
+            causes = (\(Json.Array ls) -> map evidenceFromArray ls) causes_array
+            effect_array = Maybe.maybe Json.Null (\a->a) (Dict.get "_effect" dict)
+            effects = evidenceFromArray effect_array
+        in
+        Just (AnyCause causes effects)
     _ -> Nothing
-
--- Just (AnyCause [Evidence "rain" 1] [Evidence "wet" 1])
 
 evidenceName (Evidence name _) = name
 
 render : Json.Value -> Element
 render v = case parseModel v of
     Just Ignorant -> ignorant
-    Just (AnyCause c e) -> anycause (map evidenceName c) (map evidenceName e)
+    Just (AnyCause c e) -> anycause (map evidenceName c) [evidenceName e]
     _  -> ignorant
 
 sketch : Maybe Json.Value -> Element

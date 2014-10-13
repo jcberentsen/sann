@@ -17,13 +17,17 @@ import Model
 import Evidence
 
 model :: CausalModel Text Bool
-model = rain_causes_wet_model
+model = rain_or_sprinklers
+--model = rain_causes_wet_model
 
 ignorance :: CausalModel Text Bool
 ignorance = Ignorance
 
 rain_causes_wet_model :: CausalModel Text Bool
 rain_causes_wet_model = Causally (fact "rain") (fact "wet")
+
+rain_or_sprinklers :: CausalModel Text Bool
+rain_or_sprinklers = AnyCause [fact "rain", fact "sprinklers"] (fact "wet")
 
 site :: Snap ()
 site = writeText "Hello!"
