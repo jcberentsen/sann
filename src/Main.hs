@@ -17,8 +17,8 @@ import Model
 import Evidence
 
 model :: CausalModel Text Bool
-model = rain_or_sprinklers
---model = rain_causes_wet_model
+--model = rain_or_sprinklers
+model = rain_causes_wet_model
 
 ignorance :: CausalModel Text Bool
 ignorance = Ignorance
@@ -51,7 +51,9 @@ wsApp :: WS.ServerApp
 wsApp pendingConnection = do
     connection <- WS.acceptRequest pendingConnection
     -- _msg <- WS.receiveData connection
+    WS.sendTextData connection $ encode $ ignorance
     WS.sendTextData connection $ encode $ model
+    WS.sendTextData connection $ encode $ rain_or_sprinklers
     keepAlive connection
 
 keepAlive :: WS.Connection -> IO ()

@@ -61,7 +61,8 @@ evidenceName (Evidence name _) = name
 render : Json.Value -> Element
 render v = case parseModel v of
     Just Ignorant -> ignorant
-    Just (AnyCause c e) -> anycause (map evidenceName c) [evidenceName e]
+    Just (Causally c e) -> causal_node [evidenceName c] [evidenceName e]
+    Just (AnyCause c e) -> causal_node (map evidenceName c) [evidenceName e]
     _  -> ignorant
 
 sketch : Maybe Json.Value -> Element
@@ -70,9 +71,9 @@ sketch v =
         [ toForm ignorant
         , move (100,0) (toForm fact)
         , move (280, 10) (toForm counterfact)
-        , move (10, -160) (toForm (anycause ["rain"] ["wet"]))
-        , move (300, -130) (toForm (anycause ["sprinklers", "rain"] ["wet"]))
-        , move (-50, 0) (toForm (anycause ["gravity"] ["falling"]))
+        , move (10, -160) (toForm (causal_node ["rain"] ["wet"]))
+        , move (300, -130) (toForm (causal_node ["sprinklers", "rain"] ["wet"]))
+        , move (-50, 0) (toForm (causal_node ["gravity"] ["falling"]))
         , move (350, 100) (toForm population)
         ]
 
@@ -91,8 +92,8 @@ fact = node green "rain!"
 counterfact : Element
 counterfact = node red "no sprinklers!"
 
-anycause : [String] -> [String] -> Element
-anycause causes effects =
+causal_node : [String] -> [String] -> Element
+causal_node causes effects =
     let causes' = flow right (map (node yellow) causes)
         effects' = flow right (map (node orange) effects)
         maxw = max (widthOf causes') (widthOf effects')
