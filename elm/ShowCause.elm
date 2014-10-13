@@ -4,6 +4,7 @@ import WebSocket (connect)
 import Json
 import Maybe
 import String
+import Dict
 
 eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
 
@@ -22,8 +23,37 @@ visualize v =
     collage 800 800
         [toForm (Maybe.maybe ignorant render v)]
 
+data Evidence = Evidence String Float
+data Model = Ignorant
+           | AnyCause [Evidence] [Evidence]
+
+parseModel : Json.Value -> Maybe Model
+parseModel v = case v of
+    Json.Object dict -> parseModelFromDict dict
+    _ -> Just Ignorant
+
+evidenceFromArray : Json.Value -> [Evidence]
+evidenceFromArray _ = [Evidence "rain" 1]
+--evidenceFromValue (Json.Array [e, v]) = Evidence "rain" 1
+
+parseModelFromDict : Dict.Dict String Json.Value -> Maybe Model
+parseModelFromDict dict = case Dict.get "tag" dict of
+    Just (Json.String "Causally") ->
+        let causers = Maybe.maybe Json.Null (\a->a) (Dict.get "_causer" dict)
+            causes = evidenceFromArray causers
+        in
+        Just (AnyCause causes [])
+    _ -> Nothing
+
+-- Just (AnyCause [Evidence "rain" 1] [Evidence "wet" 1])
+
+evidenceName (Evidence name _) = name
+
 render : Json.Value -> Element
-render v = ignorant
+render v = case parseModel v of
+    Just Ignorant -> ignorant
+    Just (AnyCause c e) -> anycause (map evidenceName c) (map evidenceName e)
+    _  -> ignorant
 
 sketch : Maybe Json.Value -> Element
 sketch v =
