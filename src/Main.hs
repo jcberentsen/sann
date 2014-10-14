@@ -20,8 +20,11 @@ model :: CausalModel Text Bool
 --model = rain_or_sprinklers
 model = rain_causes_wet_model
 
+wet_causes_slippery :: CausalModel Text Bool
+wet_causes_slippery = Causally (fact "wet") (fact "slippery")
+
 multi_model :: CausalModel Text Bool
-multi_model = Multiple [Evidently [fact "rain"], Causally (fact "rain") (fact "wet")]
+multi_model = Multiple [Evidently [fact "rain"], rain_or_sprinklers, wet_causes_slippery]
 
 ignorance :: CausalModel Text Bool
 ignorance = Ignorance
