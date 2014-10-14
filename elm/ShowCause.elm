@@ -24,14 +24,16 @@ visualize v =
         [toForm (Maybe.maybe ignorant render v)]
 
 data Evidence = Evidence String Bool
-data Model = Ignorant
+data Model = Ignorance
+           | Evidently [Evidence]
            | Causally Evidence Evidence
            | AnyCause [Evidence] Evidence
+           | Multiple [Model]
 
 parseModel : Json.Value -> Maybe Model
 parseModel v = case v of
-    Json.Object dict -> parseModelFromDict dict
-    _ -> Just Ignorant
+    Json.Object dict -> parseModelFromDict dict |> watch "model"
+    _ -> Just Ignorance
 
 evidenceFromArray : Json.Value -> Evidence
 evidenceFromArray v = case v of
@@ -40,6 +42,12 @@ evidenceFromArray v = case v of
 
 parseModelFromDict : Dict.Dict String Json.Value -> Maybe Model
 parseModelFromDict dict = case Dict.get "tag" dict of
+    Just (Json.String "Ignorance") -> Just Ignorance
+    Just (Json.String "Evidently") ->
+        let evidence_array = Maybe.maybe Json.Null (\a->a) (Dict.get "_evidence" dict)
+            evidences = (\(Json.Array ls) -> map evidenceFromArray ls) evidence_array
+        in
+        Just (Evidently evidences)
     Just (Json.String "Causally") ->
         let cause_array = Maybe.maybe Json.Null (\a->a) (Dict.get "_causer" dict)
             cause = evidenceFromArray cause_array
@@ -54,16 +62,28 @@ parseModelFromDict dict = case Dict.get "tag" dict of
             effects = evidenceFromArray effect_array
         in
         Just (AnyCause causes effects)
+    Just (Json.String "Multiple") ->
+        let causalities_array = Maybe.maybe Json.Null (\a->a) (Dict.get "_causalities" dict)
+            causalities = (\(Json.Array ls) -> filterMap parseModel ls) causalities_array
+        in
+            Just (Multiple causalities)
     _ -> Nothing
 
 evidenceName (Evidence name _) = name
 
 render : Json.Value -> Element
 render v = case parseModel v of
-    Just Ignorant -> ignorant
-    Just (Causally c e) -> causal_node [evidenceName c] [evidenceName e]
-    Just (AnyCause c e) -> causal_node (map evidenceName c) [evidenceName e]
-    _  -> ignorant
+  Just model -> renderModel model
+  _ -> ignorant
+
+renderModel : Model -> Element
+renderModel m = case m of
+    Ignorance -> ignorant
+    Evidently es -> causal_node (map evidenceName es) []
+    Causally c e -> causal_node [evidenceName c] [evidenceName e]
+    AnyCause c e -> causal_node (map evidenceName c) [evidenceName e]
+    Multiple cs -> flow down (map renderModel cs)
+    _ -> ignorant
 
 sketch : Maybe Json.Value -> Element
 sketch v =

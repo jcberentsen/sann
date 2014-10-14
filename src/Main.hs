@@ -20,6 +20,9 @@ model :: CausalModel Text Bool
 --model = rain_or_sprinklers
 model = rain_causes_wet_model
 
+multi_model :: CausalModel Text Bool
+multi_model = Multiple [Evidently [fact "rain"], Causally (fact "rain") (fact "wet")]
+
 ignorance :: CausalModel Text Bool
 ignorance = Ignorance
 
@@ -54,6 +57,7 @@ wsApp pendingConnection = do
     WS.sendTextData connection $ encode $ ignorance
     WS.sendTextData connection $ encode $ model
     WS.sendTextData connection $ encode $ rain_or_sprinklers
+    WS.sendTextData connection $ encode $ multi_model
     keepAlive connection
 
 keepAlive :: WS.Connection -> IO ()
