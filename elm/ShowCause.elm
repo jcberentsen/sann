@@ -42,32 +42,26 @@ evidenceFromArray v = case v of
 
 parseModelFromDict : Dict.Dict String Json.Value -> Maybe Model
 parseModelFromDict dict = case Dict.get "tag" dict of
-    Just (Json.String "Ignorance") -> Just Ignorance
-    Just (Json.String "Evidently") ->
-        let evidence_array = Maybe.maybe Json.Null (\a->a) (Dict.get "_evidence" dict)
-            evidences = (\(Json.Array ls) -> map evidenceFromArray ls) evidence_array
-        in
-        Just (Evidently evidences)
-    Just (Json.String "Causally") ->
-        let cause_array = Maybe.maybe Json.Null (\a->a) (Dict.get "_causer" dict)
-            cause = evidenceFromArray cause_array
-            effect_array = Maybe.maybe Json.Null (\a->a) (Dict.get "_effect" dict)
-            effect = evidenceFromArray effect_array
-        in
-        Just (Causally cause effect)
-    Just (Json.String "AnyCause") ->
-        let causes_array = Maybe.maybe Json.Null (\a->a) (Dict.get "_causes" dict)
-            causes = (\(Json.Array ls) -> map evidenceFromArray ls) causes_array
-            effect_array = Maybe.maybe Json.Null (\a->a) (Dict.get "_effect" dict)
-            effects = evidenceFromArray effect_array
-        in
-        Just (AnyCause causes effects)
-    Just (Json.String "Multiple") ->
-        let causalities_array = Maybe.maybe Json.Null (\a->a) (Dict.get "_causalities" dict)
-            causalities = (\(Json.Array ls) -> filterMap parseModel ls) causalities_array
-        in
-            Just (Multiple causalities)
+    Just (Json.String tag) -> parseModelTag tag dict
     _ -> Nothing
+
+parseModelTag : String -> Dict.Dict String Json.Value -> Maybe Model
+parseModelTag tag dict = case tag of
+    "Ignorance" -> Just Ignorance
+    "Evidently" -> Just (Evidently (get_evidence_array "_evidence" dict))
+    "Causally" -> Just (Causally (get_array "_causer" dict |> evidenceFromArray) (get_array "_effect" dict |> evidenceFromArray))
+    "AnyCause" -> Just (AnyCause (get_evidence_array "_causes" dict) (get_evidence "_effect" dict))
+    "Multiple" -> Just (Multiple ((\(Json.Array ls) -> filterMap parseModel ls) (get_array "_causalities" dict)))
+    _ -> Nothing
+
+get_array : String -> Dict.Dict String Json.Value -> Json.Value
+get_array name dict = Maybe.maybe (Json.Array []) (\a->a) (Dict.get name dict)
+
+get_evidence_array : String -> Dict.Dict String Json.Value -> [Evidence]
+get_evidence_array name dict = (\(Json.Array ls) -> map evidenceFromArray ls) (get_array name dict)
+
+get_evidence : String -> Dict.Dict String Json.Value -> Evidence
+get_evidence name dict = evidenceFromArray (get_array name dict)
 
 evidenceName (Evidence name _) = name
 
