@@ -10,6 +10,7 @@ import Window
 type State =
     { model : Model
     , potential : Potential
+    , population : Population
     }
 
 data Action
@@ -17,7 +18,7 @@ data Action
     | ModelChange Json.Value
 
 startingState : State
-startingState =  State Ignorance Potential
+startingState =  State Ignorance Potential (Pop [])
 
 data Evidence = Evidence String Bool
 data Model = Ignorance
@@ -27,6 +28,9 @@ data Model = Ignorance
            | Multiple [Model]
 
 data Potential = Potential
+
+data Population = Pop [(Evidence, Ratio)]
+type Ratio = (Int, Int)
 
 eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
 
@@ -92,6 +96,10 @@ renderPotential : Potential -> Element
 renderPotential p = case p of
     _ -> ignorant
 
+renderPopulation : Population -> Element
+renderPopulation p = case p of
+    _ -> ignorant
+
 causal_node : [String] -> [String] -> Element
 causal_node causes effects =
     let causes' = flow right (map (node yellow) causes)
@@ -133,7 +141,9 @@ view : State -> Element
 view state =
         flow down
             [ (renderPotential state.potential)
-            , (renderModel state.model) ]
+            , (renderModel state.model)
+            , (renderPopulation state.population)
+            ]
 
 state : Signal State
 state = foldp step startingState actions
