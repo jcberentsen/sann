@@ -78,19 +78,8 @@ get_evidence name dict = evidenceFromArray (get_array name dict)
 
 evidenceName (Evidence name _) = name
 
-step : Action -> State -> State
-step action state =
-    case action of
-        NoOp -> state
-        ModelChange v -> { state | model <- case parseModel v of
-            Just mo -> mo
-            _ -> Ignorance }
-
-scene : State -> Element
-scene state = visualize state
-
-visualize : State -> Element
-visualize state =
+view : State -> Element
+view state =
     collage 800 800
         [ toForm (renderModel state.model)
         , toForm (renderPotential state.potential) ]
@@ -139,8 +128,16 @@ population =
         element
 
 main : Signal Element
-main = lift scene state
+main = lift view state
 
 state : Signal State
 state = foldp step startingState actions
+
+step : Action -> State -> State
+step action state =
+    case action of
+        NoOp -> state
+        ModelChange v -> { state | model <- case parseModel v of
+            Just mo -> mo
+            _ -> Ignorance }
 
