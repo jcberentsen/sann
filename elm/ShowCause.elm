@@ -11,14 +11,21 @@ type State =
     , potential : Potential
     }
 
-startingState : State
-startingState =  State Ignorance Potential
-
-data Potential = Potential
-
 data Action
     = NoOp
     | ModelChange Json.Value
+
+startingState : State
+startingState =  State Ignorance Potential
+
+data Evidence = Evidence String Bool
+data Model = Ignorance
+           | Evidently [Evidence]
+           | Causally Evidence Evidence
+           | AnyCause [Evidence] Evidence
+           | Multiple [Model]
+
+data Potential = Potential
 
 eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
 
@@ -35,29 +42,6 @@ parseAction : String -> Action
 parseAction msg = case Json.fromString msg of
     Just v -> ModelChange v
     _ -> NoOp
-
-step : Action -> State -> State
-step action state =
-    case action of
-        NoOp -> state
-        ModelChange v -> { state | model <- case parseModel v of
-            Just mo -> mo
-            _ -> Ignorance }
-
-scene : State -> Element
-scene state = visualize state.model
-
-visualize : Model -> Element
-visualize model =
-    collage 800 800
-        [toForm (renderModel model)]
-
-data Evidence = Evidence String Bool
-data Model = Ignorance
-           | Evidently [Evidence]
-           | Causally Evidence Evidence
-           | AnyCause [Evidence] Evidence
-           | Multiple [Model]
 
 parseModel : Json.Value -> Maybe Model
 parseModel v = case v of
@@ -94,6 +78,23 @@ get_evidence name dict = evidenceFromArray (get_array name dict)
 
 evidenceName (Evidence name _) = name
 
+step : Action -> State -> State
+step action state =
+    case action of
+        NoOp -> state
+        ModelChange v -> { state | model <- case parseModel v of
+            Just mo -> mo
+            _ -> Ignorance }
+
+scene : State -> Element
+scene state = visualize state
+
+visualize : State -> Element
+visualize state =
+    collage 800 800
+        [ toForm (renderModel state.model)
+        , toForm (renderPotential state.potential) ]
+
 renderModel : Model -> Element
 renderModel m = case m of
     Ignorance -> ignorant
@@ -103,32 +104,9 @@ renderModel m = case m of
     Multiple cs -> flow down (map renderModel cs)
     _ -> ignorant
 
-sketch : Maybe Json.Value -> Element
-sketch v =
-    collage 800 800
-        [ toForm ignorant
-        , move (100,0) (toForm fact)
-        , move (280, 10) (toForm counterfact)
-        , move (10, -160) (toForm (causal_node ["rain"] ["wet"]))
-        , move (300, -130) (toForm (causal_node ["sprinklers", "rain"] ["wet"]))
-        , move (-50, 0) (toForm (causal_node ["gravity"] ["falling"]))
-        , move (350, 100) (toForm population)
-        ]
-
-node : Color -> String -> Element
-node c name =
-    let el = plainText name
-    in
-        color c (container (10 + widthOf el) 20 middle el)
-
-ignorant : Element
-ignorant = node grey "?"
-
-fact : Element
-fact = node green "rain!"
-
-counterfact : Element
-counterfact = node red "no sprinklers!"
+renderPotential : Potential -> Element
+renderPotential p = case p of
+    _ -> ignorant
 
 causal_node : [String] -> [String] -> Element
 causal_node causes effects =
@@ -142,6 +120,15 @@ causal_node causes effects =
             ]
     in
         color blue (container (10+maxw) (10+2*height) middle lay)
+
+node : Color -> String -> Element
+node c name =
+    let el = plainText name
+    in
+        color c (container (10 + widthOf el) 20 middle el)
+
+ignorant : Element
+ignorant = node grey "?"
 
 population : Element
 population =
