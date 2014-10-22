@@ -6,6 +6,8 @@ import Maybe
 import String
 import Dict
 import Window
+import Graphics.Input
+import Graphics.Input as Input
 
 type State =
     { model : Model
@@ -31,17 +33,6 @@ data Potential = Potential
 
 data Population = Pop [(Evidence, Ratio)]
 type Ratio = (Int, Int)
-
-eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
-
-events_to_server : Signal String
-events_to_server = constant ""
-
-events : Signal String
-events = connect eventurl events_to_server
-
-actions : Signal Action
-actions = lift parseAction events
 
 parseAction : String -> Action
 parseAction msg = case Json.fromString msg of
@@ -92,9 +83,13 @@ renderModel m = case m of
     Multiple cs -> flow down (map renderModel cs)
     _ -> ignorant
 
+
+clicks : Input.Input ()
+clicks = Input.input ()
+
 renderPotential : Potential -> Element
 renderPotential p = case p of
-    _ -> ignorant
+    _ -> Input.clickable clicks.handle () ignorant
 
 renderPopulation : Population -> Element
 renderPopulation p = case p of
@@ -131,10 +126,10 @@ population =
         element
 
 main : Signal Element
-main = lift2 scene state Window.dimensions
+main = lift3 scene state clicks.signal Window.dimensions
 
-scene : State -> (Int, Int) -> Element
-scene state (w,h) =
+scene : State -> () -> (Int, Int) -> Element
+scene state clicked (w,h) =
     container w h middle (view state)
 
 view : State -> Element
@@ -155,4 +150,15 @@ step action state =
         ModelChange v -> { state | model <- case parseModel v of
             Just mo -> mo
             _ -> Ignorance }
+
+eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
+
+events_to_server : Signal String
+events_to_server = constant ""
+
+events : Signal String
+events = connect eventurl events_to_server
+
+actions : Signal Action
+actions = lift parseAction events
 
