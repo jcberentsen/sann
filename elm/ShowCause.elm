@@ -9,18 +9,24 @@ import Window
 import Graphics.Input
 import Graphics.Input as Input
 
+import Graphics.Input.Field
+import Graphics.Input.Field as Field
+
 type State =
     { model : Model
     , potential : Potential
     , population : Population
+    , input_content : Field.Content
     }
 
 data Action
     = NoOp
-    | ModelChange Json.Value
+    | ChangeModel Json.Value
+    | UpdateInput Field.Content
+    | UpdatePotential Potential
 
 startingState : State
-startingState =  State Ignorance Potential (Pop [])
+startingState =  State Ignorance NoPotential (Pop []) Field.noContent
 
 data Evidence = Evidence String Bool
 data Model = Ignorance
@@ -29,14 +35,14 @@ data Model = Ignorance
            | AnyCause [Evidence] Evidence
            | Multiple [Model]
 
-data Potential = Potential
+data Potential = NoPotential
 
 data Population = Pop [(Evidence, Ratio)]
 type Ratio = (Int, Int)
 
 parseAction : String -> Action
 parseAction msg = case Json.fromString msg of
-    Just v -> ModelChange v
+    Just v -> ChangeModel v
     _ -> NoOp
 
 parseModel : Json.Value -> Maybe Model
@@ -84,17 +90,6 @@ renderModel m = case m of
     _ -> ignorant
 
 
-clicks : Input.Input ()
-clicks = Input.input ()
-
-renderPotential : Potential -> Element
-renderPotential p = case p of
-    _ -> Input.clickable clicks.handle () ignorant
-
-renderPopulation : Population -> Element
-renderPopulation p = case p of
-    _ -> ignorant
-
 causal_node : [String] -> [String] -> Element
 causal_node causes effects =
     let causes' = flow right (map (node yellow) causes)
@@ -135,7 +130,8 @@ scene state clicked (w,h) =
 view : State -> Element
 view state =
         flow down
-            [ (renderPotential state.potential)
+            [ potentialField state.input_content
+            , (renderPotential state.potential)
             , (renderModel state.model)
             , (renderPopulation state.population)
             ]
@@ -147,9 +143,11 @@ step : Action -> State -> State
 step action state =
     case action of
         NoOp -> state
-        ModelChange v -> { state | model <- case parseModel v of
+        ChangeModel v -> { state | model <- case parseModel v of
             Just mo -> mo
             _ -> Ignorance }
+        UpdateInput content -> { state | input_content = content }
+        UpdatePotential pot -> { state | potential = pot }
 
 eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
 
@@ -160,5 +158,34 @@ events : Signal String
 events = connect eventurl events_to_server
 
 actions : Signal Action
-actions = lift parseAction events
+actions = merges
+    [ lift parseAction events
+    , inputActions
+    , potentialActions
+    ]
 
+clicks : Input.Input ()
+clicks = Input.input ()
+
+potential_input : Input.Input Field.Content
+potential_input = Input.input Field.noContent
+
+potentialField : Field.Content -> Element
+potentialField = Field.field Field.defaultStyle potential_input.handle identity "Potential"
+
+validatedPotentials : Signal Potential
+validatedPotentials = lift (always NoPotential) potential_input.signal
+
+potentialActions : Signal Action
+potentialActions = lift UpdatePotential validatedPotentials
+
+inputActions : Signal Action
+inputActions = lift (\inp -> inp |> UpdateInput |> watch "input") potential_input.signal
+
+renderPotential : Potential -> Element
+renderPotential p = case p of
+    _ -> ignorant -- potentialField
+
+renderPopulation : Population -> Element
+renderPopulation p = case p of
+    _ -> ignorant
