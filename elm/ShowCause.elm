@@ -6,6 +6,20 @@ import Maybe
 import String
 import Dict
 
+type State =
+    { model : Model
+    , potential : Potential
+    }
+
+startingState : State
+startingState =  State Ignorance Potential
+
+data Potential = Potential
+
+data Action
+    = NoOp
+    | ModelChange Json.Value
+
 eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
 
 events_to_server : Signal String
@@ -14,14 +28,29 @@ events_to_server = constant ""
 events : Signal String
 events = connect eventurl events_to_server
 
-step : String -> Element
---step msg = msg |> Json.fromString |> (watch "msg") |> Maybe.maybe "{}" (Json.toString "") |> plainText
-step msg = msg |> Json.fromString |> (watch "msg") |> visualize
+actions : Signal Action
+actions = lift parseAction events
 
-visualize : Maybe Json.Value -> Element
-visualize v =
+parseAction : String -> Action
+parseAction msg = case Json.fromString msg of
+    Just v -> ModelChange v
+    _ -> NoOp
+
+step : Action -> State -> State
+step action state =
+    case action of
+        NoOp -> state
+        ModelChange v -> { state | model <- case parseModel v of
+            Just mo -> mo
+            _ -> Ignorance }
+
+scene : State -> Element
+scene state = visualize state.model
+
+visualize : Model -> Element
+visualize model =
     collage 800 800
-        [toForm (Maybe.maybe ignorant render v)]
+        [toForm (renderModel model)]
 
 data Evidence = Evidence String Bool
 data Model = Ignorance
@@ -64,11 +93,6 @@ get_evidence : String -> Dict.Dict String Json.Value -> Evidence
 get_evidence name dict = evidenceFromArray (get_array name dict)
 
 evidenceName (Evidence name _) = name
-
-render : Json.Value -> Element
-render v = case parseModel v of
-  Just model -> renderModel model
-  _ -> ignorant
 
 renderModel : Model -> Element
 renderModel m = case m of
@@ -128,4 +152,8 @@ population =
         element
 
 main : Signal Element
-main = lift step events
+main = lift scene state
+
+state : Signal State
+state = foldp step startingState actions
+
