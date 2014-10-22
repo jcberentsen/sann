@@ -5,6 +5,7 @@ import Json
 import Maybe
 import String
 import Dict
+import Window
 
 type State =
     { model : Model
@@ -78,12 +79,6 @@ get_evidence name dict = evidenceFromArray (get_array name dict)
 
 evidenceName (Evidence name _) = name
 
-view : State -> Element
-view state =
-    collage 800 800
-        [ toForm (renderModel state.model)
-        , toForm (renderPotential state.potential) ]
-
 renderModel : Model -> Element
 renderModel m = case m of
     Ignorance -> ignorant
@@ -128,7 +123,17 @@ population =
         element
 
 main : Signal Element
-main = lift view state
+main = lift2 scene state Window.dimensions
+
+scene : State -> (Int, Int) -> Element
+scene state (w,h) =
+    container w h middle (view state)
+
+view : State -> Element
+view state =
+        flow down
+            [ (renderPotential state.potential)
+            , (renderModel state.model) ]
 
 state : Signal State
 state = foldp step startingState actions
