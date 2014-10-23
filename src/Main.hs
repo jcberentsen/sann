@@ -17,8 +17,7 @@ import Model
 import Evidence
 
 model :: CausalModel Text Bool
---model = rain_or_sprinklers
-model = rain_causes_wet_model
+model = multi_model
 
 wet_causes_slippery :: CausalModel Text Bool
 wet_causes_slippery = Causally (fact "wet") (fact "slippery")
@@ -26,17 +25,11 @@ wet_causes_slippery = Causally (fact "wet") (fact "slippery")
 multi_model :: CausalModel Text Bool
 multi_model = Multiple [Evidently [fact "rain"], rain_or_sprinklers, wet_causes_slippery]
 
-ignorance :: CausalModel Text Bool
-ignorance = Ignorance
-
-rain_causes_wet_model :: CausalModel Text Bool
-rain_causes_wet_model = Causally (fact "rain") (fact "wet")
-
 rain_or_sprinklers :: CausalModel Text Bool
 rain_or_sprinklers = AnyCause [fact "rain", fact "sprinklers"] (fact "wet")
 
 site :: Snap ()
-site = writeText "Hello!"
+site = writeText "Connect the 'ShowCause.elm' client to 'Sann'!"
 
 config :: Config Snap a
 config = setAccessLog ConfigNoLog (setErrorLog ConfigNoLog defaultConfig)
@@ -56,11 +49,8 @@ socket = WSS.runWebSocketsSnap wsApp
 wsApp :: WS.ServerApp
 wsApp pendingConnection = do
     connection <- WS.acceptRequest pendingConnection
-    -- _msg <- WS.receiveData connection
-    WS.sendTextData connection $ encode $ ignorance
     WS.sendTextData connection $ encode $ model
-    WS.sendTextData connection $ encode $ rain_or_sprinklers
-    WS.sendTextData connection $ encode $ multi_model
+    --msg <- WS.receiveData connection
     keepAlive connection
 
 keepAlive :: WS.Connection -> IO ()
