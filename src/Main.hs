@@ -19,7 +19,7 @@ import Population
 import Observations
 
 multi_model :: CausalModel Text Bool
-multi_model = Multiple [Evidently [rain], rain_or_sprinklers, wet_causes_slippery]
+multi_model = Multiple [rain_or_sprinklers, wet_causes_slippery]
 
 rain_or_sprinklers :: CausalModel Text Bool
 rain_or_sprinklers = AnyCause [rain, fact "sprinklers"] wet
