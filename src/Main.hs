@@ -67,11 +67,12 @@ talk connection potentials = do
         _ -> do
             putStrLn $ show (msg :: Text)
             let new_alt = fact msg
-            let new_potential = toggle_alternative new_alt potentials
-            let alt_potential = Alternatively new_potential :: Potential Text Float Bool
-            let population = generate_population 2 alt_potential model
+            let new_potentials = toggle_alternative new_alt potentials
+            let alt_potentials = Alternatively new_potentials :: Potential Text Float Bool
+            let population = generate_population 2 alt_potentials model
+            WS.sendTextData connection $ encode $ new_potentials
             WS.sendTextData connection $ encode $ concat (map observations_toList population)
-            return new_potential
+            return new_potentials
 
     talk connection potentials'
 

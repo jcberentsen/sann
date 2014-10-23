@@ -25,6 +25,7 @@ data Action
     | ChangeModel Json.Value
     | UpdatePopulation [Json.Value]
     | UpdateInput Field.Content
+    | UpdatePotentials [Potential] -- from server
     | AddPotential Potential
 
 startingState : State
@@ -185,6 +186,7 @@ step action state =
             }
 
         UpdateInput content -> { state | input_content <- content }
+        UpdatePotentials pots -> { state | potentials <- pots }
 
         AddPotential "" -> state
 
