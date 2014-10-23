@@ -23,6 +23,7 @@ type State =
 data Action
     = NoOp
     | ChangeModel Json.Value
+    | UpdatePopulation [Json.Value]
     | UpdateInput Field.Content
     | AddPotential Potential
 
@@ -44,9 +45,31 @@ data Population = Pop [(Evidence, Ratio)]
 type Ratio = (Int, Int)
 
 parseAction : String -> Action
-parseAction msg = case Json.fromString msg of
-    Just v -> ChangeModel v
+parseAction msg = case Json.fromString (msg |> watch "msg") of
+    Just v -> case (v |> watch "value" |> identity) of
+        Json.Array vals -> UpdatePopulation vals
+        _ -> ChangeModel v
     _ -> NoOp
+
+parsePopulation : [Json.Value] -> Population
+parsePopulation vs = Pop (map parsePopulationPair vs)
+
+parsePopulationPair : Json.Value -> (Evidence, Ratio)
+parsePopulationPair v = case v of
+    (Json.Array [ev, p]) -> (Evidence (parseString ev) (parseBool p), (1, 1))
+    _ -> (Evidence "?" True, (0,0))
+
+parseBool : Json.Value -> Bool
+parseBool v =
+    case v of
+        Json.Boolean b -> b
+        _ -> False
+
+parseString : Json.Value -> String
+parseString v =
+    case v of
+        Json.String s -> s
+        _ -> ""
 
 parseModel : Json.Value -> Maybe Model
 parseModel v = case v of
@@ -115,11 +138,14 @@ node c name =
 ignorant : Element
 ignorant = node grey "?"
 
-population : Element
-population =
-    let tag = node blue "eyecolor"
+population_node : (Evidence, Ratio) -> Element
+population_node (Evidence e v, r) =
+    let tag = node blue e
         (w,h) = sizeOf tag
-        element = color brown (container (10+w) (10+h) middle tag)
+        col = case v of
+            True -> green
+            _ -> brown
+        element = color col (container (10+w) (10+h) middle tag)
     in
         element
 
@@ -152,6 +178,9 @@ step action state =
                 case parseModel v of
                     Just mo -> mo
                     _ -> Ignorance
+            }
+        UpdatePopulation v ->
+            { state | population <- parsePopulation v
             }
 
         UpdateInput content -> { state | input_content <- content }
@@ -222,5 +251,4 @@ renderPotential : Potential -> Element
 renderPotential p = node green p
 
 renderPopulation : Population -> Element
-renderPopulation p = case p of
-    _ -> ignorant
+renderPopulation (Pop ps) = flow right (map population_node ps)
