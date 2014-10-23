@@ -8,13 +8,14 @@ import Dict
 import Window
 import Graphics.Input
 import Graphics.Input as Input
+import Keyboard
 
 import Graphics.Input.Field
 import Graphics.Input.Field as Field
 
 type State =
     { model : Model
-    , potential : Potential
+    , potentials : [Potential]
     , population : Population
     , input_content : Field.Content
     }
@@ -23,10 +24,10 @@ data Action
     = NoOp
     | ChangeModel Json.Value
     | UpdateInput Field.Content
-    | UpdatePotential Potential
+    | AddPotential Potential
 
 startingState : State
-startingState =  State Ignorance NoPotential (Pop []) Field.noContent
+startingState =  State Ignorance [] (Pop []) Field.noContent
 
 data Evidence = Evidence String Bool
 data Model = Ignorance
@@ -35,7 +36,9 @@ data Model = Ignorance
            | AnyCause [Evidence] Evidence
            | Multiple [Model]
 
-data Potential = NoPotential
+type Potential = String
+no_potential : Potential
+no_potential = ""
 
 data Population = Pop [(Evidence, Ratio)]
 type Ratio = (Int, Int)
@@ -47,7 +50,7 @@ parseAction msg = case Json.fromString msg of
 
 parseModel : Json.Value -> Maybe Model
 parseModel v = case v of
-    Json.Object dict -> parseModelFromDict dict |> watch "model"
+    Json.Object dict -> parseModelFromDict dict
     _ -> Just Ignorance
 
 evidenceFromArray : Json.Value -> Evidence
@@ -125,13 +128,13 @@ main = lift3 scene state clicks.signal Window.dimensions
 
 scene : State -> () -> (Int, Int) -> Element
 scene state clicked (w,h) =
-    container w h middle (view state)
+    container w h middle (state |> watch "state" |> view)
 
 view : State -> Element
 view state =
         flow down
             [ potentialField state.input_content
-            , (renderPotential state.potential)
+            , (renderPotentials state.potentials)
             , (renderModel state.model)
             , (renderPopulation state.population)
             ]
@@ -141,13 +144,23 @@ state = foldp step startingState actions
 
 step : Action -> State -> State
 step action state =
-    case action of
+    case (action |> watch "action") of
         NoOp -> state
-        ChangeModel v -> { state | model <- case parseModel v of
-            Just mo -> mo
-            _ -> Ignorance }
-        UpdateInput content -> { state | input_content = content }
-        UpdatePotential pot -> { state | potential = pot }
+
+        ChangeModel v ->
+            { state | model <-
+                case parseModel v of
+                    Just mo -> mo
+                    _ -> Ignorance
+            }
+
+        UpdateInput content -> { state | input_content <- content }
+
+        AddPotential "" -> state
+
+        AddPotential pot ->
+            { state | potentials <- pot :: state.potentials
+                    , input_content <- Field.noContent}
 
 eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
 
@@ -173,18 +186,23 @@ potential_input = Input.input Field.noContent
 potentialField : Field.Content -> Element
 potentialField = Field.field Field.defaultStyle potential_input.handle identity "Potential"
 
-validatedPotentials : Signal Potential
-validatedPotentials = lift (always NoPotential) potential_input.signal
-
 potentialActions : Signal Action
-potentialActions = lift UpdatePotential validatedPotentials
+potentialActions = AddPotential <~ sampleOn entered (.string <~ potential_input.signal)
 
 inputActions : Signal Action
-inputActions = lift (\inp -> inp |> UpdateInput |> watch "input") potential_input.signal
+inputActions = UpdateInput <~ potential_input.signal
+
+{-| Signal that updates when the enter key is pressed. We will use it to sample
+other signals. Actual value of this signal is not important.
+-}
+entered : Signal ()
+entered = always () <~ keepIf identity True Keyboard.enter
+
+renderPotentials : [Potential] -> Element
+renderPotentials pots = flow right (map renderPotential pots)
 
 renderPotential : Potential -> Element
-renderPotential p = case p of
-    _ -> ignorant -- potentialField
+renderPotential p = node green p
 
 renderPopulation : Population -> Element
 renderPopulation p = case p of
