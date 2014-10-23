@@ -132,8 +132,9 @@ causal_node causes effects =
 node : Color -> String -> Element
 node c name =
     let el = plainText name
+        inner = color c (container (10 + widthOf el) 20 middle el)
     in
-        color c (container (10 + widthOf el) 20 middle el)
+        color charcoal (container (2 + widthOf inner) (2 + heightOf inner) middle inner)
 
 ignorant : Element
 ignorant = node grey "?"
