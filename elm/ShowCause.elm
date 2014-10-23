@@ -162,19 +162,36 @@ step action state =
             { state | potentials <- pot :: state.potentials
                     , input_content <- Field.noContent}
 
-eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
+isAddPotential : Action -> Bool
+isAddPotential action =
+    case action of
+        AddPotential _ -> True
+        _ -> False
 
-events_to_server : Signal String
-events_to_server = constant ""
+encodeServerAction : Action -> String
+encodeServerAction _ = ""
+
+eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
 
 events : Signal String
 events = connect eventurl events_to_server
 
+events_to_server : Signal String
+events_to_server =
+    (\action ->
+        case (action |> watch "action to server") of
+            AddPotential "" -> ""
+            AddPotential pot -> pot
+    ) <~ serverActions
+
+serverActions : Signal Action
+serverActions = keepIf isAddPotential NoOp potentialActions
+
 actions : Signal Action
 actions = merges
-    [ lift parseAction events
+    [ potentialActions
     , inputActions
-    , potentialActions
+    , lift parseAction events
     ]
 
 clicks : Input.Input ()

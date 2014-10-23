@@ -50,8 +50,13 @@ wsApp :: WS.ServerApp
 wsApp pendingConnection = do
     connection <- WS.acceptRequest pendingConnection
     WS.sendTextData connection $ encode $ model
-    --msg <- WS.receiveData connection
+    talk connection
     keepAlive connection
+
+talk :: WS.Connection -> IO ()
+talk connection = forever $ do
+    msg <- WS.receiveData connection
+    putStrLn $ show (msg :: Text)
 
 keepAlive :: WS.Connection -> IO ()
 keepAlive connection = do
