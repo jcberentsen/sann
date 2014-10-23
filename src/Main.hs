@@ -9,7 +9,7 @@ import qualified Network.WebSockets as WS
 import Control.Concurrent
 
 import qualified Data.ByteString.Char8 as BSC
-import Data.Text (Text)
+import Data.Text (Text, empty)
 import           Data.Aeson                          (encode)
 
 import Population ()
@@ -56,7 +56,9 @@ wsApp pendingConnection = do
 talk :: WS.Connection -> IO ()
 talk connection = forever $ do
     msg <- WS.receiveData connection
-    putStrLn $ show (msg :: Text)
+    unless (msg == Data.Text.empty) $ do
+        putStrLn $ show (msg :: Text)
+        WS.sendTextData connection $ encode $ wet_causes_slippery
 
 keepAlive :: WS.Connection -> IO ()
 keepAlive connection = do
