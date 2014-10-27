@@ -31,6 +31,7 @@ import Observations
 data Actions name p =
       PotentialUpdate (Alternatives name p)
     | ModelUpdate (CausalModel name p)
+    | ModelMenu [Text]
     | PopulationUpdate [[Evidence name p]]
 
 $(deriveToJSON defaultOptions ''Actions)
@@ -71,6 +72,7 @@ weather_potentials = Alternatives []
 wsApp :: WS.ServerApp
 wsApp pendingConnection = do
     connection <- WS.acceptRequest pendingConnection
+    WS.sendTextData connection $ encode $ ((ModelMenu ["weather", "eyecolor", "Monty Hall", "faces"]) :: Actions Text Bool)
     WS.sendTextData connection $ encode $ ModelUpdate multi_model
     talk connection weather_potentials
     --keepAlive connection

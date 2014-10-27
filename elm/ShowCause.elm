@@ -15,21 +15,27 @@ import Graphics.Input.Field as Field
 
 type State =
     { model : Model
+    , model_menu : [String]
     , potentials : [Potential]
+    , samples : Int
     , population : Population
-    , input_content : Field.Content
     }
+
+startingState : State
+startingState = State Ignorance [] [] 1 (Pop [])
 
 data Action
     = NoOp
+    -- from server
     | ModelUpdate Json.Value
+    | ModelMenu Json.Value
     | PopulationUpdate Json.Value
     | PotentialUpdate Json.Value
-    | InputUpdate Field.Content
-    | AddPotential Potential
 
-startingState : State
-startingState =  State Ignorance [] (Pop []) Field.noContent
+    -- user input
+    | AdditionalAlternative Potential
+    | SampleCount Int
+
 
 data Evidence = Evidence String Bool
 data Model = Ignorance
@@ -46,12 +52,13 @@ data Population = Pop [[(Evidence, Ratio)]]
 type Ratio = (Int, Int)
 
 parseAction : String -> Action
-parseAction msg = case Json.fromString (msg |> watch "msg") of
-    Just v -> case (v |> watch "value" |> identity) of
+parseAction msg = case Json.fromString msg of
+    Just v -> case v of
         Json.Object dict -> case Dict.get "tag" dict of
             Just (Json.String "ModelUpdate") -> Maybe.maybe NoOp ModelUpdate (Dict.get "contents" dict)
             Just (Json.String "PopulationUpdate") -> Maybe.maybe NoOp PopulationUpdate (Dict.get "contents" dict)
             Just (Json.String "PotentialUpdate") -> Maybe.maybe NoOp PotentialUpdate (Dict.get "contents" dict)
+            Just (Json.String "ModelMenu") -> Maybe.maybe NoOp ModelMenu (Dict.get "contents" dict)
             _ -> NoOp
 
         _ -> NoOp
@@ -97,6 +104,11 @@ parseModel : Json.Value -> Maybe Model
 parseModel v = case v of
     Json.Object dict -> parseModelFromDict dict
     _ -> Just Ignorance
+
+parseModelMenu : Json.Value -> [String]
+parseModelMenu v = case v of
+    Json.Array items -> map parseString items
+    _ -> []
 
 evidenceFromArray : Json.Value -> Evidence
 evidenceFromArray v = case v of
@@ -173,27 +185,34 @@ population_node (Evidence e v, r) =
         element
 
 main : Signal Element
-main = lift3 scene state clicks.signal Window.dimensions
+main = lift4 scene state alternativeContent samplesContent Window.dimensions
 
-scene : State -> () -> (Int, Int) -> Element
-scene state clicked (w,h) =
-    container w h middle (state |> watch "state" |> view)
+scene : State -> Field.Content -> Field.Content -> (Int, Int) -> Element
+scene state alternativeContent sampleContent (w,h) =
+    container w h middle ((state, alternativeContent, sampleContent) |> watch "state" |> view)
 
-view : State -> Element
-view state =
+view : (State, Field.Content, Field.Content) -> Element
+view (state, alternativeContent, samplesContent) =
         flow down
-            [ potentialField state.input_content
+            [ flow right (map renderMenuItem state.model_menu)
+            , flow right [alternativeField alternativeContent, samplesField samplesContent]
             , (renderPotentials state.potentials)
             , (renderModel state.model)
             , (renderPopulation state.population)
             ]
 
+renderMenuItem : String -> Element
+renderMenuItem content = node lightPurple content
+
 state : Signal State
-state = foldp step startingState actions
+state = foldp step startingState action
+
+steps : [Action] -> State -> State
+steps actions state = actions |> watch "actions" |> foldl step state
 
 step : Action -> State -> State
 step action state =
-    case (action |> watch "action") of
+    case (watch "action" action) of
         NoOp -> state
 
         ModelUpdate v ->
@@ -202,23 +221,18 @@ step action state =
                     Just mo -> mo
                     _ -> Ignorance
             }
+
+        ModelMenu v ->
+            { state | model_menu <- parseModelMenu v
+            }
+
         PopulationUpdate v ->
             { state | population <- parsePopulation v
             }
 
-        InputUpdate content -> { state | input_content <- content }
         PotentialUpdate pots -> { state | potentials <- parsePotentials pots }
 
-        AddPotential "" -> state
-
-        AddPotential pot ->
-            { state | input_content <- Field.noContent}
-
-isAddPotential : Action -> Bool
-isAddPotential action =
-    case action of
-        AddPotential _ -> True
-        _ -> False
+        SampleCount count -> { state | samples <- count }
 
 encodeServerAction : Action -> String
 encodeServerAction _ = ""
@@ -232,34 +246,50 @@ events_to_server : Signal String
 events_to_server =
     (\action ->
         case (action |> watch "action to server") of
-            AddPotential "" -> ""
-            AddPotential pot -> pot
+            AdditionalAlternative pot -> pot
+            _ -> ""
     ) <~ serverActions
 
 serverActions : Signal Action
-serverActions = keepIf isAddPotential NoOp potentialActions
+--serverActions = keepIf isAddPotential NoOp potentialActions
+serverActions = alternativeActions
 
-actions : Signal Action
-actions = merges
-    [ potentialActions
-    , inputActions
+action : Signal Action
+action = merges
+    [ samplesActions
+    , alternativeActions
     , lift parseAction events
     ]
 
 clicks : Input.Input ()
 clicks = Input.input ()
 
-potential_input : Input.Input Field.Content
-potential_input = Input.input Field.noContent
+alternative_input : Input.Input Field.Content
+alternative_input = Input.input Field.noContent
 
-potentialField : Field.Content -> Element
-potentialField = Field.field Field.defaultStyle potential_input.handle identity "Potential"
+alternativeContent : Signal Field.Content
+alternativeContent = merge alternative_input.signal (always Field.noContent <~ entered)
 
-potentialActions : Signal Action
-potentialActions = AddPotential <~ sampleOn entered (.string <~ potential_input.signal)
+alternativeField : Field.Content -> Element
+alternativeField = Field.field Field.defaultStyle alternative_input.handle identity "Alternative"
 
-inputActions : Signal Action
-inputActions = InputUpdate <~ potential_input.signal
+alternativeActions : Signal Action
+alternativeActions = AdditionalAlternative <~ enteredAlternative
+
+enteredAlternative : Signal String
+enteredAlternative = dropIf String.isEmpty "" (sampleOn entered (.string <~ alternative_input.signal))
+
+samples_input : Input.Input Field.Content
+samples_input = Input.input Field.noContent
+
+samplesContent : Signal Field.Content
+samplesContent = samples_input.signal
+
+samplesField : Field.Content -> Element
+samplesField = Field.field Field.defaultStyle samples_input.handle identity "Samples"
+
+samplesActions : Signal Action
+samplesActions = (String.toInt >> Maybe.maybe 1 identity >> SampleCount) <~ sampleOn entered (.string <~ samples_input.signal)
 
 {-| Signal that updates when the enter key is pressed. We will use it to sample
 other signals. Actual value of this signal is not important.
