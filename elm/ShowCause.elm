@@ -22,10 +22,10 @@ type State =
 
 data Action
     = NoOp
-    | ChangeModel Json.Value
-    | UpdatePopulation [Json.Value]
-    | UpdateInput Field.Content
-    | UpdatePotentials [Potential] -- from server
+    | ModelUpdate Json.Value
+    | PopulationUpdate Json.Value
+    | PotentialUpdate Json.Value
+    | InputUpdate Field.Content
     | AddPotential Potential
 
 startingState : State
@@ -42,18 +42,39 @@ type Potential = String
 no_potential : Potential
 no_potential = ""
 
-data Population = Pop [(Evidence, Ratio)]
+data Population = Pop [[(Evidence, Ratio)]]
 type Ratio = (Int, Int)
 
 parseAction : String -> Action
 parseAction msg = case Json.fromString (msg |> watch "msg") of
     Just v -> case (v |> watch "value" |> identity) of
-        Json.Array vals -> UpdatePopulation vals
-        _ -> ChangeModel v
+        Json.Object dict -> case Dict.get "tag" dict of
+            Just (Json.String "ModelUpdate") -> Maybe.maybe NoOp ModelUpdate (Dict.get "contents" dict)
+            Just (Json.String "PopulationUpdate") -> Maybe.maybe NoOp PopulationUpdate (Dict.get "contents" dict)
+            Just (Json.String "PotentialUpdate") -> Maybe.maybe NoOp PotentialUpdate (Dict.get "contents" dict)
+            _ -> NoOp
+
+        _ -> NoOp
     _ -> NoOp
 
-parsePopulation : [Json.Value] -> Population
-parsePopulation vs = Pop (map parsePopulationPair vs)
+parsePotentials : Json.Value -> [Potential]
+parsePotentials v = case v of
+    (Json.Array pots) -> map parsePotential pots
+    _ -> []
+
+parsePotential : Json.Value -> Potential
+parsePotential v = case v of
+    (Json.Array [pot, p]) -> parseString pot
+    _ -> ""
+
+parsePopulation : Json.Value -> Population
+parsePopulation v = case v of
+    Json.Array vs -> Pop (map parsePopulationSet vs)
+    _ -> Pop []
+
+parsePopulationSet : Json.Value -> [(Evidence, Ratio)]
+parsePopulationSet v = case v of
+    (Json.Array vs) -> map parsePopulationPair vs
 
 parsePopulationPair : Json.Value -> (Evidence, Ratio)
 parsePopulationPair v = case v of
@@ -175,24 +196,23 @@ step action state =
     case (action |> watch "action") of
         NoOp -> state
 
-        ChangeModel v ->
+        ModelUpdate v ->
             { state | model <-
                 case parseModel v of
                     Just mo -> mo
                     _ -> Ignorance
             }
-        UpdatePopulation v ->
+        PopulationUpdate v ->
             { state | population <- parsePopulation v
             }
 
-        UpdateInput content -> { state | input_content <- content }
-        UpdatePotentials pots -> { state | potentials <- pots }
+        InputUpdate content -> { state | input_content <- content }
+        PotentialUpdate pots -> { state | potentials <- parsePotentials pots }
 
         AddPotential "" -> state
 
         AddPotential pot ->
-            { state | potentials <- pot :: state.potentials
-                    , input_content <- Field.noContent}
+            { state | input_content <- Field.noContent}
 
 isAddPotential : Action -> Bool
 isAddPotential action =
@@ -239,7 +259,7 @@ potentialActions : Signal Action
 potentialActions = AddPotential <~ sampleOn entered (.string <~ potential_input.signal)
 
 inputActions : Signal Action
-inputActions = UpdateInput <~ potential_input.signal
+inputActions = InputUpdate <~ potential_input.signal
 
 {-| Signal that updates when the enter key is pressed. We will use it to sample
 other signals. Actual value of this signal is not important.
@@ -254,4 +274,4 @@ renderPotential : Potential -> Element
 renderPotential p = node green p
 
 renderPopulation : Population -> Element
-renderPopulation (Pop ps) = flow right (map population_node ps)
+renderPopulation (Pop ps) = flow down (map (\s -> flow right (map population_node s)) ps)

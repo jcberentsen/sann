@@ -1,5 +1,11 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE OverloadedStrings, DeriveDataTypeable #-}
+{-# LANGUAGE
+      OverloadedStrings
+    , GADTs
+    , DeriveDataTypeable
+    , DeriveGeneric
+    , TemplateHaskell
+    #-}
 
 module Main where
 
@@ -12,11 +18,22 @@ import qualified Data.ByteString.Char8 as BSC
 import Data.Text (Text, empty)
 import           Data.Aeson                          (encode)
 
+import Data.Typeable
+import GHC.Generics
+import Data.Aeson.TH
+
 import Model
 import Evidence
 import Likelyhood
 import Population
 import Observations
+
+data Actions name p =
+      PotentialUpdate (Alternatives name p)
+    | ModelUpdate (CausalModel name p)
+    | PopulationUpdate [[Evidence name p]]
+
+$(deriveToJSON defaultOptions ''Actions)
 
 multi_model :: CausalModel Text Bool
 multi_model = Multiple [rain_or_sprinklers, wet_causes_slippery]
@@ -54,7 +71,7 @@ weather_potentials = Alternatives []
 wsApp :: WS.ServerApp
 wsApp pendingConnection = do
     connection <- WS.acceptRequest pendingConnection
-    WS.sendTextData connection $ encode $ multi_model
+    WS.sendTextData connection $ encode $ ModelUpdate multi_model
     talk connection weather_potentials
     --keepAlive connection
 
@@ -70,8 +87,8 @@ talk connection potentials = do
             let new_potentials = toggle_alternative new_alt potentials
             let alt_potentials = Alternatively new_potentials :: Potential Text Float Bool
             let population = generate_population 2 alt_potentials model
-            WS.sendTextData connection $ encode $ new_potentials
-            WS.sendTextData connection $ encode $ concat (map observations_toList population)
+            WS.sendTextData connection $ encode $ PotentialUpdate $ new_potentials
+            WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
             return new_potentials
 
     talk connection potentials'
