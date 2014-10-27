@@ -16,7 +16,7 @@ import Control.Concurrent
 
 import qualified Data.ByteString.Char8 as BSC
 import Data.Text (Text, empty)
-import           Data.Aeson                          (encode)
+import           Data.Aeson                          (encode, decode)
 
 import Data.Typeable
 import GHC.Generics
@@ -35,6 +35,17 @@ data Actions name p =
     | PopulationUpdate [[Evidence name p]]
 
 $(deriveToJSON defaultOptions ''Actions)
+
+data Session = Session
+    { alternatives :: Alternatives Text Bool
+    , samples :: Int }
+
+data ServerAction
+    = AddAlternative Text
+    | SampleCount Int
+    deriving (Show)
+
+$(deriveFromJSON defaultOptions ''ServerAction)
 
 multi_model :: CausalModel Text Bool
 multi_model = Multiple [rain_or_sprinklers, wet_causes_slippery]
@@ -79,26 +90,26 @@ wsApp pendingConnection = do
     WS.sendTextData connection $ encode $ ModelUpdate multi_model
     talk connection $ Session weather_potentials 2
 
-data Session = Session
-    { alternatives :: Alternatives Text Bool
-    , samples :: Int }
-
 talk :: WS.Connection -> Session -> IO ()
 talk connection session = do
     let model = multi_model
     msg <- WS.receiveData connection
-    let alts = alternatives session
-    potentials' <- case msg of
-        "" -> return $ alternatives session
-        _ -> do
-            putStrLn $ show (msg :: Text)
-            let new_alt = fact msg
-            let new_potentials = toggle_alternative new_alt alts
-            let alt_potentials = Alternatively new_potentials :: Potential Text Float Bool
-            let population = generate_population (samples session) alt_potentials model
-            WS.sendTextData connection $ encode $ PotentialUpdate $ new_potentials
-            WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
-            return new_potentials
+    let action = decode msg
 
-    talk connection session { alternatives = potentials' }
+    let alts = alternatives session
+    alts' <- case action of
+        Just (AddAlternative alt) -> do
+            putStrLn $ show action
+            let toggled = toggle_alternative (fact alt) alts
+            let alternatively = Alternatively toggled :: Potential Text Float Bool
+            let population = generate_population (samples session) alternatively model
+            WS.sendTextData connection $ encode $ PotentialUpdate $ toggled
+            WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
+            return toggled
+        _ -> do
+            putStrLn $ "Could not decode from client"
+            putStrLn $ show msg
+            return alts
+
+    talk connection session { alternatives = alts' }
 
