@@ -69,37 +69,36 @@ socket = WSS.runWebSocketsSnap wsApp
 weather_potentials :: Alternatives Text Bool
 weather_potentials = Alternatives []
 
+modelMenu :: Actions Text Bool
+modelMenu = ModelMenu ["weather", "eyecolor", "Monty Hall", "faces"]
+
 wsApp :: WS.ServerApp
 wsApp pendingConnection = do
     connection <- WS.acceptRequest pendingConnection
-    WS.sendTextData connection $ encode $ ((ModelMenu ["weather", "eyecolor", "Monty Hall", "faces"]) :: Actions Text Bool)
+    WS.sendTextData connection $ encode modelMenu
     WS.sendTextData connection $ encode $ ModelUpdate multi_model
-    talk connection weather_potentials
-    --keepAlive connection
+    talk connection $ Session weather_potentials 2
 
-talk :: WS.Connection -> Alternatives Text Bool -> IO ()
-talk connection potentials = do
+data Session = Session
+    { alternatives :: Alternatives Text Bool
+    , samples :: Int }
+
+talk :: WS.Connection -> Session -> IO ()
+talk connection session = do
     let model = multi_model
     msg <- WS.receiveData connection
+    let alts = alternatives session
     potentials' <- case msg of
-        "" -> return potentials
+        "" -> return $ alternatives session
         _ -> do
             putStrLn $ show (msg :: Text)
             let new_alt = fact msg
-            let new_potentials = toggle_alternative new_alt potentials
+            let new_potentials = toggle_alternative new_alt alts
             let alt_potentials = Alternatively new_potentials :: Potential Text Float Bool
-            let population = generate_population 2 alt_potentials model
+            let population = generate_population (samples session) alt_potentials model
             WS.sendTextData connection $ encode $ PotentialUpdate $ new_potentials
             WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
             return new_potentials
 
-    talk connection potentials'
-
-{-
-keepAlive :: WS.Connection -> IO ()
-keepAlive connection = do
-    WS.sendPing connection $ BSC.pack "ping"
-    threadDelay $ 10 * (1000000) -- 10 seconds
-    keepAlive connection
--}
+    talk connection session { alternatives = potentials' }
 
