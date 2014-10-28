@@ -185,27 +185,21 @@ population_node (Evidence e v, r) =
         element
 
 main : Signal Element
-main = lift4 scene state alternativeContent samplesContent Window.dimensions
+main = lift3 scene state alternativeContent Window.dimensions
 
-scene : State -> Field.Content -> Field.Content -> (Int, Int) -> Element
-scene state alternativeContent sampleContent (w,h) =
-    container w h middle ((state, alternativeContent, sampleContent) |> watch "state" |> view)
+scene : State -> Field.Content -> (Int, Int) -> Element
+scene state alternativeContent (w,h) =
+    container w h middle ((state, alternativeContent) |> watch "state" |> view)
 
-view : (State, Field.Content, Field.Content) -> Element
-view (state, alternativeContent, samplesContent) =
+view : (State, Field.Content) -> Element
+view (state, alternativeContent) =
         flow down
             [ renderMenu state.model_menu
-            , flow right [alternativeField alternativeContent, samplesField samplesContent]
+            , flow right [alternativeField alternativeContent, samplesMenu]
             , (renderPotentials state.potentials)
             , (renderModel state.model)
             , (renderPopulation state.population)
             ]
-
-menuInput : Input.Input Action
-menuInput = Input.input NoOp
-
-renderMenu : [String] -> Element
-renderMenu items = Input.dropDown menuInput.handle (zip items (map ModelChoice items))
 
 state : Signal State
 state = foldp step startingState action
@@ -267,6 +261,12 @@ action = merges
     , lift parseAction events
     ]
 
+menuInput : Input.Input Action
+menuInput = Input.input NoOp
+
+renderMenu : [String] -> Element
+renderMenu items = Input.dropDown menuInput.handle (zip items (map ModelChoice items))
+
 clicks : Input.Input ()
 clicks = Input.input ()
 
@@ -285,17 +285,13 @@ alternativeActions = AdditionalAlternative <~ enteredAlternative
 enteredAlternative : Signal String
 enteredAlternative = dropIf String.isEmpty "" (sampleOn entered (.string <~ alternative_input.signal))
 
-samples_input : Input.Input Field.Content
-samples_input = Input.input Field.noContent
+samplesInput : Input.Input Action
+samplesInput = Input.input NoOp
 
-samplesContent : Signal Field.Content
-samplesContent = samples_input.signal
+samplesMenu : Element
+samplesMenu = Input.dropDown samplesInput.handle (map (\n -> (show n, SampleChoice n)) [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 50, 100, 1000, 10000])
 
-samplesField : Field.Content -> Element
-samplesField = Field.field Field.defaultStyle samples_input.handle identity "Samples"
-
-samplesActions : Signal Action
-samplesActions = (String.toInt >> Maybe.maybe 1 identity >> SampleChoice) <~ sampleOn entered (.string <~ samples_input.signal)
+samplesActions = samplesInput.signal
 
 {-| Signal that updates when the enter key is pressed. We will use it to sample
 other signals. Actual value of this signal is not important.
