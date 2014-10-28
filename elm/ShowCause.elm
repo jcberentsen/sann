@@ -42,6 +42,7 @@ data Model = Ignorance
            | Evidently [Evidence]
            | Causally Evidence Evidence
            | AnyCause [Evidence] Evidence
+           | AllCause [Evidence] Evidence
            | Multiple [Model]
 
 type Potential = String
@@ -126,6 +127,7 @@ parseModelTag tag dict = case tag of
     "Evidently" -> Just (Evidently (get_evidence_array "_evidence" dict))
     "Causally" -> Just (Causally (get_array "_causer" dict |> evidenceFromArray) (get_array "_effect" dict |> evidenceFromArray))
     "AnyCause" -> Just (AnyCause (get_evidence_array "_causes" dict) (get_evidence "_effect" dict))
+    "AllCause" -> Just (AllCause (get_evidence_array "_causes" dict) (get_evidence "_effect" dict))
     "Multiple" -> Just (Multiple ((\(Json.Array ls) -> filterMap parseModel ls) (get_array "_causalities" dict)))
     _ -> Nothing
 
@@ -146,6 +148,7 @@ renderModel m = case m of
     Evidently es -> causal_node (map evidenceName es) []
     Causally c e -> causal_node [evidenceName c] [evidenceName e]
     AnyCause c e -> causal_node (map evidenceName c) [evidenceName e]
+    AllCause c e -> flow right [node blue "all", causal_node (map evidenceName c) [evidenceName e]]
     Multiple cs -> flow down (map renderModel cs)
     _ -> ignorant
 
@@ -240,10 +243,10 @@ events = connect eventurl events_to_server
 
 events_to_server : Signal String
 events_to_server =
-    (\action -> watch "action to server" action |> encodeServerActions) <~ serverActions
+    (\action -> action :: [] |> watch "action to server" |> encodeServerActions) <~ serverActions
 
-serverActions : Signal [Action]
-serverActions = combine [menuInput.signal, samplesActions, alternativeActions]
+serverActions : Signal Action
+serverActions = merges [menuInput.signal, samplesActions, alternativeActions]
 
 encodeServerActions : [Action] -> String
 encodeServerActions actions = "[" ++ join ", " (map (\action -> case action of

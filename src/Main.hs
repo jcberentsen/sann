@@ -22,6 +22,9 @@ import Data.Typeable
 import GHC.Generics
 import Data.Aeson.TH
 
+import Examples.MontyHall
+import Examples.DihybridCross
+
 import Model
 import Evidence
 import Likelyhood
@@ -87,8 +90,17 @@ socket = WSS.runWebSocketsSnap wsApp
 no_potentials :: Alternatives Text Bool
 no_potentials = Alternatives []
 
+models :: [(Text, CausalModel Text Bool)]
+models =
+    [ ("weather", multi_model)
+    , ("MontyHall stay", staying_game)
+    , ("MontyHall switch", switching_game)
+    , ("green eyes", devo)
+    , ("devo brown eyes", devo_brown)
+    ]
+
 modelMenu :: Actions Text Bool
-modelMenu = ModelMenu ["weather", "eyecolor", "Monty Hall", "faces"]
+modelMenu = ModelMenu $ map fst models
 
 wsApp :: WS.ServerApp
 wsApp pendingConnection = do
@@ -113,8 +125,9 @@ talk connection session = do
     talk connection session'
 
     where
-        (Session model alts tosses) = session
         advance session action =
+            let (Session model alts tosses) = session
+            in
             case action of
                 AddAlternative "" -> return session
                 AddAlternative alt -> do
@@ -135,7 +148,7 @@ talk connection session = do
 
                 ModelChoice model_name -> do
                     putStrLn $ show action
-                    let model' = rain_or_sprinklers
+                    let model' = maybe model id $ lookup model_name models
                     let session' = session { session_model = model', session_alternatives=no_potentials }
                     WS.sendTextData connection $ encode $ ModelUpdate model'
                     WS.sendTextData connection $ encode $ PotentialUpdate $ no_potentials
