@@ -42,11 +42,13 @@ $(deriveToJSON defaultOptions ''Actions)
 data Session = Session
     { session_model :: CausalModel Text Bool
     , session_alternatives :: Alternatives Text Bool
+    , session_priors :: [Likelyhood Text Double]
     , session_tosses :: Int
     }
 
 data ServerAction
     = AddAlternative Text
+    | AddPrior Text
     | SampleChoice Int
     | ModelChoice Text
     | NoOp
@@ -90,6 +92,9 @@ socket = WSS.runWebSocketsSnap wsApp
 no_potentials :: Alternatives Text Bool
 no_potentials = Alternatives []
 
+no_priors = [] :: [Likelyhood Text Double]
+--no_priors = [Likelyhood "rain" (P 0.5), Likelyhood "sprinklers" (P 0.1)] :: [Likelyhood Text Float]
+
 models :: [(Text, CausalModel Text Bool)]
 models =
     [ ("weather", multi_model)
@@ -107,7 +112,7 @@ wsApp pendingConnection = do
     connection <- WS.acceptRequest pendingConnection
     WS.sendTextData connection $ encode modelMenu
     WS.sendTextData connection $ encode $ ModelUpdate multi_model
-    talk connection $ Session multi_model no_potentials 2
+    talk connection $ Session multi_model no_potentials no_priors 2
 
 talk :: WS.Connection -> Session -> IO ()
 talk connection session = do
@@ -126,22 +131,32 @@ talk connection session = do
 
     where
         advance session action =
-            let (Session model alts tosses) = session
+            let (Session model alts priors tosses) = session
             in
             case action of
                 AddAlternative "" -> return session
+                AddPrior "" -> return session
+
+                AddPrior alt -> do
+                    putStrLn $ show action
+                    let priors' = (Likelyhood alt (P 0.5)) : priors
+                    let potential = Likely priors'
+                    let population = generate_population tosses potential model
+                    WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
+                    return $ session { session_priors = priors' }
+
                 AddAlternative alt -> do
                     putStrLn $ show action
                     let toggled = toggle_alternative (fact alt) alts
-                    let alternatively = Alternatively toggled :: Potential Text Float Bool
+                    let alternatively = Alternatively toggled :: Potential Text Double Bool
                     let population = generate_population tosses alternatively model
                     WS.sendTextData connection $ encode $ PotentialUpdate $ toggled
                     WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
-                    return $ session { session_alternatives = toggled, session_tosses=3 }
+                    return $ session { session_alternatives = toggled }
 
                 SampleChoice tosses -> do
                     putStrLn $ show action
-                    let alternatively = Alternatively alts :: Potential Text Float Bool
+                    let alternatively = Alternatively alts :: Potential Text Double Bool
                     let population = generate_population tosses alternatively model
                     WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
                     return $ session { session_tosses=tosses }

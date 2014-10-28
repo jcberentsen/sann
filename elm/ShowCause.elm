@@ -33,7 +33,8 @@ data Action
     | PotentialUpdate Json.Value
 
     -- user input, to server
-    | AdditionalAlternative Potential
+    | AddAlternative Potential
+    | AddPrior String
     | SampleChoice Int
     | ModelChoice String
 
@@ -250,7 +251,8 @@ serverActions = merges [menuInput.signal, samplesActions, alternativeActions]
 
 encodeServerActions : [Action] -> String
 encodeServerActions actions = "[" ++ join ", " (map (\action -> case action of
-    AdditionalAlternative alt -> "{\"tag\":\"AddAlternative\",\"contents\":\"" ++ alt ++ "\"}"
+    AddAlternative alt -> "{\"tag\":\"AddPrior\",\"contents\":\"" ++ alt ++ "\"}"
+    AddPrior alt -> "{\"tag\":\"AddPrior\",\"contents\":\"" ++ alt ++ "\"}"
     ModelChoice modelname     -> "{\"tag\":\"ModelChoice\",\"contents\":\"" ++ modelname ++ "\"}"
     SampleChoice tosses       -> "{\"tag\":\"SampleChoice\",\"contents\":" ++ show tosses ++ "}"
     NoOp -> "{\"tag\":\"NoOp\",\"contents\":[]}"
@@ -283,7 +285,7 @@ alternativeField : Field.Content -> Element
 alternativeField = Field.field Field.defaultStyle alternative_input.handle identity "Alternative"
 
 alternativeActions : Signal Action
-alternativeActions = AdditionalAlternative <~ enteredAlternative
+alternativeActions = AddAlternative <~ enteredAlternative
 
 enteredAlternative : Signal String
 enteredAlternative = dropIf String.isEmpty "" (sampleOn entered (.string <~ alternative_input.signal))
