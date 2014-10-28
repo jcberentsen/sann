@@ -32,10 +32,9 @@ data Action
     | PopulationUpdate Json.Value
     | PotentialUpdate Json.Value
 
-    -- user input
+    -- user input, to server
     | AdditionalAlternative Potential
     | SampleCount Int
-
 
 data Evidence = Evidence String Bool
 data Model = Ignorance
@@ -234,9 +233,6 @@ step action state =
 
         SampleCount count -> { state | samples <- count }
 
-encodeServerAction : Action -> String
-encodeServerAction _ = ""
-
 eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
 
 events : Signal String
@@ -244,15 +240,16 @@ events = connect eventurl events_to_server
 
 events_to_server : Signal String
 events_to_server =
-    (\action ->
-        case (action |> watch "action to server") of
-            AdditionalAlternative pot -> pot
-            _ -> ""
-    ) <~ serverActions
+    (\action -> watch "action to server" action |> encodeServerActions) <~ serverActions
 
-serverActions : Signal Action
---serverActions = keepIf isAddPotential NoOp potentialActions
-serverActions = alternativeActions
+serverActions : Signal [Action]
+serverActions = combine [samplesActions, alternativeActions]
+
+encodeServerActions : [Action] -> String
+encodeServerActions actions = "[" ++ join ", " (map (\action -> case action of
+    AdditionalAlternative alt -> "{\"tag\":\"AddAlternative\",\"contents\":\"" ++ alt ++ "\"}"
+    SampleCount tosses -> "{\"tag\":\"SampleCount\",\"contents\":" ++ show tosses ++ "}"
+    _ -> "{}") actions) ++ "]"
 
 action : Signal Action
 action = merges

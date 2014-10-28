@@ -37,15 +37,17 @@ data Actions name p =
 $(deriveToJSON defaultOptions ''Actions)
 
 data Session = Session
-    { alternatives :: Alternatives Text Bool
-    , samples :: Int }
+    { session_model :: CausalModel Text Bool
+    , session_alternatives :: Alternatives Text Bool
+    , session_tosses :: Int
+    }
 
 data ServerAction
     = AddAlternative Text
     | SampleCount Int
     deriving (Show)
 
-$(deriveFromJSON defaultOptions ''ServerAction)
+$(deriveJSON defaultOptions ''ServerAction)
 
 multi_model :: CausalModel Text Bool
 multi_model = Multiple [rain_or_sprinklers, wet_causes_slippery]
@@ -88,28 +90,43 @@ wsApp pendingConnection = do
     connection <- WS.acceptRequest pendingConnection
     WS.sendTextData connection $ encode modelMenu
     WS.sendTextData connection $ encode $ ModelUpdate multi_model
-    talk connection $ Session weather_potentials 2
+    talk connection $ Session multi_model weather_potentials 2
 
 talk :: WS.Connection -> Session -> IO ()
 talk connection session = do
-    let model = multi_model
     msg <- WS.receiveData connection
-    let action = decode msg
+    let decoded = decode msg
+    session' <-
+        case decoded of
+            Just actions -> foldM advance session actions
 
-    let alts = alternatives session
-    alts' <- case action of
-        Just (AddAlternative alt) -> do
-            putStrLn $ show action
-            let toggled = toggle_alternative (fact alt) alts
-            let alternatively = Alternatively toggled :: Potential Text Float Bool
-            let population = generate_population (samples session) alternatively model
-            WS.sendTextData connection $ encode $ PotentialUpdate $ toggled
-            WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
-            return toggled
-        _ -> do
-            putStrLn $ "Could not decode from client"
-            putStrLn $ show msg
-            return alts
+            _ -> do
+                putStrLn $ "Could not decode from client"
+                putStrLn $ show msg
+                return session
 
-    talk connection session { alternatives = alts' }
+    talk connection session'
+
+    where
+        (Session model alts tosses) = session
+        advance session action =
+            case action of
+                AddAlternative "" -> return session
+                AddAlternative alt -> do
+                    putStrLn $ show action
+                    let toggled = toggle_alternative (fact alt) alts
+                    let alternatively = Alternatively toggled :: Potential Text Float Bool
+                    let population = generate_population tosses alternatively model
+                    WS.sendTextData connection $ encode $ PotentialUpdate $ toggled
+                    WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
+                    return $ session { session_alternatives = toggled, session_tosses=3 }
+
+                SampleCount tosses -> do
+                    putStrLn $ show action
+                    let alternatively = Alternatively alts :: Potential Text Float Bool
+                    let population = generate_population tosses alternatively model
+                    WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
+                    return $ session { session_tosses=tosses }
+
+                _ -> return session
 
