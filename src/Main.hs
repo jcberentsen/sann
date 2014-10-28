@@ -44,7 +44,9 @@ data Session = Session
 
 data ServerAction
     = AddAlternative Text
-    | SampleCount Int
+    | SampleChoice Int
+    | ModelChoice Text
+    | NoOp
     deriving (Show)
 
 $(deriveJSON defaultOptions ''ServerAction)
@@ -60,6 +62,9 @@ wet_causes_slippery = Causally (wet) (fact "slippery")
 
 rain = fact "rain"
 wet = fact "wet"
+
+no_population :: [[Evidence Text Bool]]
+no_population = []
 
 site :: Snap ()
 site = writeText "Connect the 'ShowCause.elm' client to 'Sann'!"
@@ -79,8 +84,8 @@ main =
 socket :: Snap ()
 socket = WSS.runWebSocketsSnap wsApp
 
-weather_potentials :: Alternatives Text Bool
-weather_potentials = Alternatives []
+no_potentials :: Alternatives Text Bool
+no_potentials = Alternatives []
 
 modelMenu :: Actions Text Bool
 modelMenu = ModelMenu ["weather", "eyecolor", "Monty Hall", "faces"]
@@ -90,7 +95,7 @@ wsApp pendingConnection = do
     connection <- WS.acceptRequest pendingConnection
     WS.sendTextData connection $ encode modelMenu
     WS.sendTextData connection $ encode $ ModelUpdate multi_model
-    talk connection $ Session multi_model weather_potentials 2
+    talk connection $ Session multi_model no_potentials 2
 
 talk :: WS.Connection -> Session -> IO ()
 talk connection session = do
@@ -121,12 +126,21 @@ talk connection session = do
                     WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
                     return $ session { session_alternatives = toggled, session_tosses=3 }
 
-                SampleCount tosses -> do
+                SampleChoice tosses -> do
                     putStrLn $ show action
                     let alternatively = Alternatively alts :: Potential Text Float Bool
                     let population = generate_population tosses alternatively model
                     WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
                     return $ session { session_tosses=tosses }
+
+                ModelChoice model_name -> do
+                    putStrLn $ show action
+                    let model' = rain_or_sprinklers
+                    let session' = session { session_model = model', session_alternatives=no_potentials }
+                    WS.sendTextData connection $ encode $ ModelUpdate model'
+                    WS.sendTextData connection $ encode $ PotentialUpdate $ no_potentials
+                    WS.sendTextData connection $ encode $ PopulationUpdate $ no_population
+                    return $ session'
 
                 _ -> return session
 

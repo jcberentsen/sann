@@ -34,7 +34,8 @@ data Action
 
     -- user input, to server
     | AdditionalAlternative Potential
-    | SampleCount Int
+    | SampleChoice Int
+    | ModelChoice String
 
 data Evidence = Evidence String Bool
 data Model = Ignorance
@@ -193,15 +194,18 @@ scene state alternativeContent sampleContent (w,h) =
 view : (State, Field.Content, Field.Content) -> Element
 view (state, alternativeContent, samplesContent) =
         flow down
-            [ flow right (map renderMenuItem state.model_menu)
+            [ renderMenu state.model_menu
             , flow right [alternativeField alternativeContent, samplesField samplesContent]
             , (renderPotentials state.potentials)
             , (renderModel state.model)
             , (renderPopulation state.population)
             ]
 
-renderMenuItem : String -> Element
-renderMenuItem content = node lightPurple content
+menuInput : Input.Input Action
+menuInput = Input.input NoOp
+
+renderMenu : [String] -> Element
+renderMenu items = Input.dropDown menuInput.handle (zip items (map ModelChoice items))
 
 state : Signal State
 state = foldp step startingState action
@@ -231,7 +235,9 @@ step action state =
 
         PotentialUpdate pots -> { state | potentials <- parsePotentials pots }
 
-        SampleCount count -> { state | samples <- count }
+        SampleChoice count -> { state | samples <- count }
+
+        _ -> state
 
 eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
 
@@ -243,17 +249,20 @@ events_to_server =
     (\action -> watch "action to server" action |> encodeServerActions) <~ serverActions
 
 serverActions : Signal [Action]
-serverActions = combine [samplesActions, alternativeActions]
+serverActions = combine [menuInput.signal, samplesActions, alternativeActions]
 
 encodeServerActions : [Action] -> String
 encodeServerActions actions = "[" ++ join ", " (map (\action -> case action of
     AdditionalAlternative alt -> "{\"tag\":\"AddAlternative\",\"contents\":\"" ++ alt ++ "\"}"
-    SampleCount tosses -> "{\"tag\":\"SampleCount\",\"contents\":" ++ show tosses ++ "}"
+    ModelChoice modelname     -> "{\"tag\":\"ModelChoice\",\"contents\":\"" ++ modelname ++ "\"}"
+    SampleChoice tosses       -> "{\"tag\":\"SampleChoice\",\"contents\":" ++ show tosses ++ "}"
+    NoOp -> "{\"tag\":\"NoOp\",\"contents\":[]}"
     _ -> "{}") actions) ++ "]"
 
 action : Signal Action
 action = merges
-    [ samplesActions
+    [ menuInput.signal
+    , samplesActions
     , alternativeActions
     , lift parseAction events
     ]
@@ -286,7 +295,7 @@ samplesField : Field.Content -> Element
 samplesField = Field.field Field.defaultStyle samples_input.handle identity "Samples"
 
 samplesActions : Signal Action
-samplesActions = (String.toInt >> Maybe.maybe 1 identity >> SampleCount) <~ sampleOn entered (.string <~ samples_input.signal)
+samplesActions = (String.toInt >> Maybe.maybe 1 identity >> SampleChoice) <~ sampleOn entered (.string <~ samples_input.signal)
 
 {-| Signal that updates when the enter key is pressed. We will use it to sample
 other signals. Actual value of this signal is not important.
