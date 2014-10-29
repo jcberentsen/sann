@@ -47,27 +47,29 @@ mockRenderProbabilityDensity = pieChart [(plainText "rain", 0.5), (plainText "sp
 
 mockRenderPopulationPie : Element
 mockRenderPopulationPie = flow right
-  [ pieChart [(plainText "wet", 0.75)]
+  [ pieChart [(plainText "rain", 0.5)]
+  , pieChart [(plainText "sprinklers", 0.1)]
+  , pieChart [(plainText "wet", 0.75)]
   , pieChart [(plainText "slippery", 0.75)]
   ]
 
 pieChart : [(Element, Float)] -> Element
 pieChart els =
     let fracs = map snd els
-        offsets = scanl (+) 0 fracs
-    in  collage 200 200 <|
-        concat (zipWith3 (pieSlice 100) colors offsets els)
+        offsets = scanl (+) -0.5 fracs
+    in  collage 175 175 <|
+        concat (zipWith3 (pieSlice 80) colors offsets els)
 
 pieSlice : Float -> Color -> Float -> (Element, Float) -> [Form]
 pieSlice radius colr offset (node, angle) =
-    let makePoint t = fromPolar (radius, degrees (360 * offset + t))
-    in  [ filled colr << polygon <| (0,0) :: map makePoint[ 0 .. 360 * angle ]
-        , toForm (flow down [node, (asPercent angle)]) |> move (fromPolar (radius*0.7, turns (offset + angle/2)))
+    let makePoint t = fromPolar (radius, degrees (360 * offset - t))
+    in  [ filled colr << polygon <| (0,0) :: map makePoint [0 .. 360 * angle]
+        , toForm (flow down [node, (asPercent angle)]) |> move (fromPolar (radius*0.7, 0 - turns (offset + angle/2)))
         ]
 
 colors : [Color]
 colors =
-    [ lightBlue, lightGreen, lightYellow, lightRed
+    [ green, lightYellow, lightRed, lightBlue
     , lightPurple, blue, green, yellow, red, purple
     ]
 
