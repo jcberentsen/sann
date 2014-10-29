@@ -2,23 +2,27 @@ module View where
 
 import Debug (watch)
 
-import Maybe
-import String
-import Window
-import Graphics.Input
 import Graphics.Input as Input
-import Keyboard
-
-import Graphics.Input.Field
 import Graphics.Input.Field as Field
 
 import Types (..)
 import Action (..)
-import Serialize (..)
 import State (..)
 import Inputs (..)
 
-evidenceName (Evidence name _) = name
+scene : State -> Field.Content -> (Int, Int) -> Element
+scene state alternativeContent (w,h) =
+    container w h middle ((state, alternativeContent) |> watch "state" |> view)
+
+view : (State, Field.Content) -> Element
+view (state, alternativeContent) =
+        flow down
+            [ renderMenu state.model_menu
+            , flow right [alternativeField alternativeContent, samplesMenu]
+            , (renderPotentials state.potentials)
+            , (renderModel state.model)
+            , (renderPopulation state.population)
+            ]
 
 renderModel : Model -> Element
 renderModel m = case m of
@@ -29,6 +33,21 @@ renderModel m = case m of
     AllCause c e -> flow right [node blue "all", causal_node (map evidenceName c) [evidenceName e]]
     Multiple cs -> flow down (map renderModel cs)
     _ -> ignorant
+
+renderMenu : [String] -> Element
+renderMenu items = Input.dropDown menuInput.handle (zip items (map ModelChoice items))
+
+renderPotentials : [Potential] -> Element
+renderPotentials pots = flow right (map renderPotential pots)
+
+renderPotential : Potential -> Element
+renderPotential p = node green p
+
+renderPopulation : Population -> Element
+renderPopulation (Pop ps) = flow down (map (\s -> flow right (map population_node s)) ps)
+
+samplesMenu : Element
+samplesMenu = Input.dropDown samplesInput.handle (map (\n -> (show n, SampleChoice n)) [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 50, 100, 1000, 10000])
 
 causal_node : [String] -> [String] -> Element
 causal_node causes effects =
@@ -64,35 +83,6 @@ population_node (Evidence e v, r) =
     in
         element
 
-scene : State -> Field.Content -> (Int, Int) -> Element
-scene state alternativeContent (w,h) =
-    container w h middle ((state, alternativeContent) |> watch "state" |> view)
-
-view : (State, Field.Content) -> Element
-view (state, alternativeContent) =
-        flow down
-            [ renderMenu state.model_menu
-            , flow right [alternativeField alternativeContent, samplesMenu]
-            , (renderPotentials state.potentials)
-            , (renderModel state.model)
-            , (renderPopulation state.population)
-            ]
-
-
-renderMenu : [String] -> Element
-renderMenu items = Input.dropDown menuInput.handle (zip items (map ModelChoice items))
-
 alternativeField : Field.Content -> Element
 alternativeField = Field.field Field.defaultStyle alternative_input.handle identity "Alternative"
 
-samplesMenu : Element
-samplesMenu = Input.dropDown samplesInput.handle (map (\n -> (show n, SampleChoice n)) [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 50, 100, 1000, 10000])
-
-renderPotentials : [Potential] -> Element
-renderPotentials pots = flow right (map renderPotential pots)
-
-renderPotential : Potential -> Element
-renderPotential p = node green p
-
-renderPopulation : Population -> Element
-renderPopulation (Pop ps) = flow down (map (\s -> flow right (map population_node s)) ps)

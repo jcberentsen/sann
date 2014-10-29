@@ -1,6 +1,9 @@
 module Types where
 
 data Evidence = Evidence String Bool
+
+evidenceName (Evidence name _) = name
+
 data Model = Ignorance
            | Evidently [Evidence]
            | Causally Evidence Evidence
