@@ -1,19 +1,6 @@
-module Main where
+module Client where
 
-import Debug (watch)
-
-import WebSocket (connect)
-import Json
-import Maybe
-import String
-import Dict
 import Window
-import Graphics.Input
-import Graphics.Input as Input
-import Keyboard
-
-import Graphics.Input.Field
-import Graphics.Input.Field as Field
 
 import Types (..)
 import Action (..)
@@ -28,12 +15,9 @@ main = lift3 scene state alternativeContent Window.dimensions
 state : Signal State
 state = foldp step startingState action
 
-steps : [Action] -> State -> State
-steps actions state = actions |> watch "actions" |> foldl step state
-
 step : Action -> State -> State
 step action state =
-    case (watch "action" action) of
+    case action of
         NoOp -> state
 
         ModelUpdate v ->
