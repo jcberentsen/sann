@@ -19,6 +19,7 @@ view (state, alternativeContent) =
         flow down
             [ renderMenu state.model_menu
             , flow right [alternativeField alternativeContent, samplesMenu]
+            , renderProbabilityDensity
             , (renderPotentials state.potentials)
             , (renderModel state.model)
             , (renderPopulation state.population)
@@ -39,6 +40,33 @@ renderMenu items = Input.dropDown menuInput.handle (zip items (map ModelChoice i
 
 renderPotentials : [Potential] -> Element
 renderPotentials pots = flow right (map renderPotential pots)
+
+renderProbabilityDensity : Element
+renderProbabilityDensity = pieChart [(plainText "rain", 0.5), (plainText "sprinklers", 0.1)]
+
+pieChart : [(Element, Float)] -> Element
+pieChart els =
+    let fracs = map snd els
+        offsets = scanl (+) 0 fracs
+    in  collage 200 200 <|
+        concat (zipWith3 (pieSlice 100) colors offsets els)
+
+pieSlice : Float -> Color -> Float -> (Element, Float) -> [Form]
+pieSlice radius colr offset (node, angle) =
+    let makePoint t = fromPolar (radius, degrees (360 * offset + t))
+    in  [ filled colr << polygon <| (0,0) :: map makePoint[ 0 .. 360 * angle ]
+        , toForm (flow down [node, (asPercent angle)]) |> move (fromPolar (radius*0.7, turns (offset + angle/2)))
+        ]
+
+colors : [Color]
+colors =
+    [ lightBlue, lightGreen, lightYellow, lightRed
+    , lightPurple, blue, green, yellow, red, purple
+    ]
+
+asPercent : Float -> Element
+asPercent fraction =
+      plainText <| show (toFloat (truncate (fraction * 100))) ++ "%"
 
 renderPotential : Potential -> Element
 renderPotential p = node green p
