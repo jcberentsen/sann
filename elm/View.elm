@@ -19,10 +19,11 @@ view (state, alternativeContent) =
         flow down
             [ renderMenu state.model_menu
             , flow right [alternativeField alternativeContent, samplesMenu]
-            , renderProbabilityDensity
+            , mockRenderProbabilityDensity
             , (renderPotentials state.potentials)
             , (renderModel state.model)
             , (renderPopulation state.population)
+            , mockRenderPopulationPie
             ]
 
 renderModel : Model -> Element
@@ -41,8 +42,14 @@ renderMenu items = Input.dropDown menuInput.handle (zip items (map ModelChoice i
 renderPotentials : [Potential] -> Element
 renderPotentials pots = flow right (map renderPotential pots)
 
-renderProbabilityDensity : Element
-renderProbabilityDensity = pieChart [(plainText "rain", 0.5), (plainText "sprinklers", 0.1)]
+mockRenderProbabilityDensity : Element
+mockRenderProbabilityDensity = pieChart [(plainText "rain", 0.5), (plainText "sprinklers", 0.1)]
+
+mockRenderPopulationPie : Element
+mockRenderPopulationPie = flow right
+  [ pieChart [(plainText "wet", 0.75)]
+  , pieChart [(plainText "slippery", 0.75)]
+  ]
 
 pieChart : [(Element, Float)] -> Element
 pieChart els =
