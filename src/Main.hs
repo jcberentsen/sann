@@ -31,11 +31,12 @@ import Likelyhood
 import Population
 import Observations
 
-data Actions name p =
-      PotentialUpdate (Alternatives name p)
-    | ModelUpdate (CausalModel name p)
+data Actions =
+      PotentialUpdate (Alternatives Text Bool)
+    | PriorsUpdate [Likelyhood Text Double]
+    | ModelUpdate (CausalModel Text Bool)
     | ModelMenu [Text]
-    | PopulationUpdate [[Evidence name p]]
+    | PopulationUpdate [[Evidence Text Bool]]
 
 $(deriveToJSON defaultOptions ''Actions)
 
@@ -104,7 +105,7 @@ models =
     , ("devo brown eyes", devo_brown)
     ]
 
-modelMenu :: Actions Text Bool
+modelMenu :: Actions
 modelMenu = ModelMenu $ map fst models
 
 wsApp :: WS.ServerApp
@@ -112,7 +113,8 @@ wsApp pendingConnection = do
     connection <- WS.acceptRequest pendingConnection
     WS.sendTextData connection $ encode modelMenu
     WS.sendTextData connection $ encode $ ModelUpdate multi_model
-    talk connection $ Session multi_model no_potentials no_priors 2
+    let initial_session = Session multi_model no_potentials no_priors 2
+    talk connection initial_session
 
 talk :: WS.Connection -> Session -> IO ()
 talk connection session = do
@@ -142,6 +144,7 @@ talk connection session = do
                     let priors' = (Likelyhood alt (P 0.5)) : priors
                     let potential = Likely priors'
                     let population = generate_population tosses potential model
+                    WS.sendTextData connection $ encode $ PriorsUpdate $ priors'
                     WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
                     return $ session { session_priors = priors' }
 

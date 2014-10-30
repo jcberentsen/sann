@@ -17,9 +17,10 @@ scene state alternativeContent (w,h) =
 view : (State, Field.Content) -> Element
 view (state, alternativeContent) =
         flow down
-            [ renderMenu state.model_menu
-            , flow right [alternativeField alternativeContent, samplesMenu]
-            , mockRenderProbabilityDensity
+            [ flow right [plainText "Model: ", renderMenu state.model_menu]
+            , flow right [plainText "Prior: ", alternativeField alternativeContent]
+            , flow right [plainText "Tosses: ", samplesMenu]
+            , (renderProbabilityDensity state.priors)
             , (renderPotentials state.potentials)
             , (renderModel state.model)
             , (renderPopulation state.population)
@@ -42,8 +43,8 @@ renderMenu items = Input.dropDown menuInput.handle (zip items (map ModelChoice i
 renderPotentials : [Potential] -> Element
 renderPotentials pots = flow right (map renderPotential pots)
 
-mockRenderProbabilityDensity : Element
-mockRenderProbabilityDensity = pieChart [(plainText "rain", 0.5), (plainText "sprinklers", 0.1)]
+renderProbabilityDensity : [(String, Float)] -> Element
+renderProbabilityDensity els = pieChart (map (\(a,b) -> (plainText a, b)) els)
 
 mockRenderPopulationPie : Element
 mockRenderPopulationPie = flow right
@@ -121,5 +122,5 @@ population_node (Evidence e v, r) =
         element
 
 alternativeField : Field.Content -> Element
-alternativeField = Field.field Field.defaultStyle alternative_input.handle identity "Alternative"
+alternativeField = Field.field Field.defaultStyle alternative_input.handle identity "Prior"
 

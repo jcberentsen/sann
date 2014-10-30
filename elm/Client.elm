@@ -36,6 +36,7 @@ step action state =
             }
 
         PotentialUpdate pots -> { state | potentials <- parsePotentials pots }
+        PriorsUpdate ps -> { state | priors <- parsePriors ps }
 
         SampleChoice count -> { state | samples <- count }
 

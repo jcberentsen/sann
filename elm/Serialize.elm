@@ -15,6 +15,7 @@ parseAction msg = case Json.fromString msg of
             Just (Json.String "ModelUpdate") -> Maybe.maybe NoOp ModelUpdate (Dict.get "contents" dict)
             Just (Json.String "PopulationUpdate") -> Maybe.maybe NoOp PopulationUpdate (Dict.get "contents" dict)
             Just (Json.String "PotentialUpdate") -> Maybe.maybe NoOp PotentialUpdate (Dict.get "contents" dict)
+            Just (Json.String "PriorsUpdate") -> Maybe.maybe NoOp PriorsUpdate (Dict.get "contents" dict)
             Just (Json.String "ModelMenu") -> Maybe.maybe NoOp ModelMenu (Dict.get "contents" dict)
             _ -> NoOp
 
@@ -30,6 +31,16 @@ parsePotential : Json.Value -> Potential
 parsePotential v = case v of
     (Json.Array [pot, p]) -> parseString pot
     _ -> ""
+
+parsePriors : Json.Value -> [(String,Float)]
+parsePriors v = case v of
+    (Json.Array ps) -> map parsePrior ps
+    _ -> []
+
+parsePrior : Json.Value -> (String, Float)
+parsePrior v = case v of
+    (Json.Array [pot, p]) -> (parseString pot, parseFloat p)
+    _ -> ("?",0.0)
 
 parsePopulation : Json.Value -> Population
 parsePopulation v = case v of
@@ -50,6 +61,12 @@ parseBool v =
     case v of
         Json.Boolean b -> b
         _ -> False
+
+parseFloat : Json.Value -> Float
+parseFloat v =
+    case v of
+        Json.Number b -> b
+        _ -> 1.0
 
 parseString : Json.Value -> String
 parseString v =

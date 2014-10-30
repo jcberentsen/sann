@@ -8,8 +8,9 @@ data Action
     -- from server
     | ModelUpdate Json.Value
     | ModelMenu Json.Value
-    | PopulationUpdate Json.Value
     | PotentialUpdate Json.Value
+    | PriorsUpdate Json.Value
+    | PopulationUpdate Json.Value
 
     -- user input, to server
     | AddAlternative Potential
