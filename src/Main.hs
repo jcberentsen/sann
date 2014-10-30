@@ -164,7 +164,11 @@ talk connection session = do
                 ModelChoice model_name -> do
                     putStrLn $ show action
                     let model' = maybe model id $ lookup model_name models
-                    let session' = session { session_model = model', session_alternatives=no_potentials }
+                    let session' = session {
+                          session_model = model'
+                        , session_alternatives=no_potentials
+                        , session_priors=no_priors
+                        }
                     WS.sendTextData connection $ encode $ ModelUpdate model'
                     WS.sendTextData connection $ encode $ PotentialUpdate $ no_potentials
                     WS.sendTextData connection $ encode $ PopulationUpdate $ no_population
