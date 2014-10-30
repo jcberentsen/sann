@@ -17,7 +17,7 @@ import Action (..)
 import Serialize (..)
 import State (..)
 
-eventurl = "ws://chrberenbox.rd.tandberg.com:8000/socket"
+eventurl = "ws://localhost:8000/socket"
 
 events : Signal String
 events = connect eventurl events_to_server
