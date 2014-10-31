@@ -10,15 +10,18 @@ import Action (..)
 import State (..)
 import Inputs (..)
 
-scene : State -> Field.Content -> (Int, Int) -> Element
-scene state alternativeContent (w,h) =
-    container w h middle ((state, alternativeContent) |> watch "state" |> view)
+scene : State -> Field.Content -> Field.Content -> (Int, Int) -> Element
+scene state alternativeContent probabilityContent (w,h) =
+    container w h middle ((state, alternativeContent, probabilityContent) |> watch "state" |> view)
 
-view : (State, Field.Content) -> Element
-view (state, alternativeContent) =
+view : (State, Field.Content, Field.Content) -> Element
+view (state, alternativeContent, probabilityContent) =
         flow down
             [ flow right [plainText "Model: ", renderMenu state.model_menu]
-            , flow right [plainText "Prior: ", alternativeField alternativeContent]
+            , flow right
+                [ plainText "P(", alternativeField alternativeContent, plainText ")="
+                , probabilityField probabilityContent
+                ]
             , flow right [plainText "Tosses: ", samplesMenu]
             , (renderProbabilityDensity state.priors)
             , (renderPotentials state.potentials)
@@ -57,15 +60,16 @@ mockRenderPopulationPie = flow right
 pieChart : [(Element, Float)] -> Element
 pieChart els =
     let fracs = map snd els
-        offsets = scanl (+) -0.5 fracs
+        offsets = scanl (+) 0 fracs
     in  collage 175 175 <|
         concat (zipWith3 (pieSlice 80) colors offsets els)
 
 pieSlice : Float -> Color -> Float -> (Element, Float) -> [Form]
 pieSlice radius colr offset (node, angle) =
-    let makePoint t = fromPolar (radius, degrees (360 * offset - t))
+    let makePoint t = fromPolar (radius, degrees (180 - 360 * offset - t))
     in  [ filled colr << polygon <| (0,0) :: map makePoint [0 .. 360 * angle]
-        , toForm (flow down [node, (asPercent angle)]) |> move (fromPolar (radius*0.7, 0 - turns (offset + angle/2)))
+        , toForm (flow down [node, (asPercent angle)])
+            |> move (fromPolar (radius*0.7, turns (0.5 - (offset + angle/2))))
         ]
 
 colors : [Color]
@@ -122,5 +126,7 @@ population_node (Evidence e v, r) =
         element
 
 alternativeField : Field.Content -> Element
-alternativeField = Field.field Field.defaultStyle alternative_input.handle identity "Prior"
+alternativeField = Field.field Field.defaultStyle alternativeInput.handle identity "tag"
 
+probabilityField : Field.Content -> Element
+probabilityField = Field.field Field.defaultStyle probabilityInput.handle identity "0.0-1.0"

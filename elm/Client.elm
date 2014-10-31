@@ -10,7 +10,7 @@ import State (..)
 import Inputs (..)
 
 main : Signal Element
-main = lift3 scene state alternativeContent Window.dimensions
+main = lift4 scene state alternativeContent probabilityContent Window.dimensions
 
 state : Signal State
 state = foldp step startingState action

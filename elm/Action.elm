@@ -14,7 +14,7 @@ data Action
 
     -- user input, to server
     | AddAlternative Potential
-    | AddPrior String
+    | AddPrior String Float
     | SampleChoice Int
     | ModelChoice String
 

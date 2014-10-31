@@ -117,7 +117,7 @@ get_evidence name dict = evidenceFromArray (get_array name dict)
 encodeServerActions : [Action] -> String
 encodeServerActions actions = "[" ++ join ", " (map (\action -> case action of
     AddAlternative alt -> "{\"tag\":\"AddPrior\",\"contents\":\"" ++ alt ++ "\"}"
-    AddPrior alt -> "{\"tag\":\"AddPrior\",\"contents\":\"" ++ alt ++ "\"}"
+    AddPrior alt p -> "{\"tag\":\"AddPrior\",\"contents\":[\"" ++ alt ++ "\", " ++ show p ++ "]}"
     ModelChoice modelname     -> "{\"tag\":\"ModelChoice\",\"contents\":\"" ++ modelname ++ "\"}"
     SampleChoice tosses       -> "{\"tag\":\"SampleChoice\",\"contents\":" ++ show tosses ++ "}"
     NoOp -> "{\"tag\":\"NoOp\",\"contents\":[]}"

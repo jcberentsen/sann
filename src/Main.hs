@@ -49,7 +49,7 @@ data Session = Session
 
 data ServerAction
     = AddAlternative Text
-    | AddPrior Text
+    | AddPrior Text Double
     | SampleChoice Int
     | ModelChoice Text
     | NoOp
@@ -137,11 +137,11 @@ talk connection session = do
             in
             case action of
                 AddAlternative "" -> return session
-                AddPrior "" -> return session
+                AddPrior "" _ -> return session
 
-                AddPrior alt -> do
+                AddPrior alt p -> do
                     putStrLn $ show action
-                    let priors' = (Likelyhood alt (P 0.5)) : priors
+                    let priors' = (Likelyhood alt (P p)) : priors
                     let potential = Likely priors'
                     let population = generate_population tosses potential model
                     WS.sendTextData connection $ encode $ PriorsUpdate $ priors'

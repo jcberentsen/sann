@@ -8,6 +8,7 @@ import Window
 import Graphics.Input
 import Graphics.Input as Input
 import Keyboard
+import Maybe
 
 import Graphics.Input.Field
 import Graphics.Input.Field as Field
@@ -43,17 +44,31 @@ menuInput = Input.input NoOp
 clicks : Input.Input ()
 clicks = Input.input ()
 
-alternative_input : Input.Input Field.Content
-alternative_input = Input.input Field.noContent
+alternativeInput : Input.Input Field.Content
+alternativeInput = Input.input Field.noContent
 
 alternativeContent : Signal Field.Content
-alternativeContent = merge alternative_input.signal (always Field.noContent <~ entered)
+alternativeContent = merge alternativeInput.signal (always Field.noContent <~ entered)
+
+probabilityInput : Input.Input Field.Content
+probabilityInput = Input.input Field.noContent
+
+probabilityContent : Signal Field.Content
+probabilityContent = probabilityInput.signal
+
+probabilities : Signal Float
+probabilities = ((.string) >> defaultParseFloat 0.5) <~ probabilityInput.signal
+
+defaultParseFloat : Float -> String -> Float
+defaultParseFloat def s = case (String.toFloat s) of
+    Nothing -> def
+    Just f -> f
 
 alternativeActions : Signal Action
-alternativeActions = AddAlternative <~ enteredAlternative
+alternativeActions = sampleOn entered (lift2 AddPrior tokens probabilities)
 
-enteredAlternative : Signal String
-enteredAlternative = dropIf String.isEmpty "" (sampleOn entered (.string <~ alternative_input.signal))
+tokens : Signal String
+tokens = .string <~ alternativeInput.signal
 
 samplesInput : Input.Input Action
 samplesInput = Input.input NoOp
