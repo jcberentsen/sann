@@ -9,7 +9,8 @@ type State =
     , priors : [(String, Float)]
     , samples : Int
     , population : Population
+    , population_summary : [(String, Float)]
     }
 
 startingState : State
-startingState = State Ignorance [] [] [] 1 (Pop [])
+startingState = State Ignorance [] [] [] 1 (Pop []) []

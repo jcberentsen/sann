@@ -11,6 +11,7 @@ data Action
     | PotentialUpdate Json.Value
     | PriorsUpdate Json.Value
     | PopulationUpdate Json.Value
+    | PopulationSummary Json.Value
 
     -- user input, to server
     | AddAlternative Potential

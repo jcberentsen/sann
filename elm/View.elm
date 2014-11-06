@@ -27,7 +27,7 @@ view (state, alternativeContent, probabilityContent) =
             , (renderPotentials state.potentials)
             , (renderModel state.model)
             , (renderPopulation state.population)
-            , mockRenderPopulationPie
+            , (renderPopulationSummary state.population_summary)
             ]
 
 renderModel : Model -> Element
@@ -49,13 +49,8 @@ renderPotentials pots = flow right (map renderPotential pots)
 renderProbabilityDensity : [(String, Float)] -> Element
 renderProbabilityDensity els = pieChart (map (\(a,b) -> (plainText a, b)) els)
 
-mockRenderPopulationPie : Element
-mockRenderPopulationPie = flow right
-  [ pieChart [(plainText "rain", 0.5)]
-  , pieChart [(plainText "sprinklers", 0.1)]
-  , pieChart [(plainText "wet", 0.75)]
-  , pieChart [(plainText "slippery", 0.75)]
-  ]
+renderPopulationSummary : [(String, Float)] -> Element
+renderPopulationSummary els = flow right (map (\dens -> renderProbabilityDensity [dens]) els)
 
 pieChart : [(Element, Float)] -> Element
 pieChart els =

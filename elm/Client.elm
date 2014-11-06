@@ -35,6 +35,10 @@ step action state =
             { state | population <- parsePopulation v
             }
 
+        PopulationSummary v ->
+            { state | population_summary <- parsePopulationSummary v
+            }
+
         PotentialUpdate pots -> { state | potentials <- parsePotentials pots }
         PriorsUpdate ps -> { state | priors <- parsePriors ps }
 

@@ -14,6 +14,7 @@ parseAction msg = case Json.fromString msg of
         Json.Object dict -> case Dict.get "tag" dict of
             Just (Json.String "ModelUpdate") -> Maybe.maybe NoOp ModelUpdate (Dict.get "contents" dict)
             Just (Json.String "PopulationUpdate") -> Maybe.maybe NoOp PopulationUpdate (Dict.get "contents" dict)
+            Just (Json.String "PopulationSummary") -> Maybe.maybe NoOp PopulationSummary (Dict.get "contents" dict)
             Just (Json.String "PotentialUpdate") -> Maybe.maybe NoOp PotentialUpdate (Dict.get "contents" dict)
             Just (Json.String "PriorsUpdate") -> Maybe.maybe NoOp PriorsUpdate (Dict.get "contents" dict)
             Just (Json.String "ModelMenu") -> Maybe.maybe NoOp ModelMenu (Dict.get "contents" dict)
@@ -55,6 +56,16 @@ parsePopulationPair : Json.Value -> (Evidence, Ratio)
 parsePopulationPair v = case v of
     (Json.Array [ev, p]) -> (Evidence (parseString ev) (parseBool p), (1, 1))
     _ -> (Evidence "?" True, (0,0))
+
+parsePopulationSummary : Json.Value -> [(String, Float)]
+parsePopulationSummary v = case v of
+    Json.Array vs -> map parseDensity vs
+    _ -> []
+
+parseDensity : Json.Value -> (String, Float)
+parseDensity v = case v of
+    (Json.Array [name, p]) -> ((parseString name), (parseFloat p))
+    _ -> ("?", 0.0)
 
 parseBool : Json.Value -> Bool
 parseBool v =
