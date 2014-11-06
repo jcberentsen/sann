@@ -126,7 +126,19 @@ talk connection session = do
     let decoded = decode msg
     session' <-
         case decoded of
-            Just actions -> foldM advance session actions
+            Just actions -> do
+                session'@(Session model alts priors tosses) <- foldM advance session actions
+                WS.sendTextData connection $ encode $ ModelUpdate model
+                let potential = Likely priors
+                let population = generate_population tosses potential model
+                let population_list = map observations_toList population
+                let population_summary = summarizePopulation population
+                WS.sendTextData connection $ encode $ PriorsUpdate $ priors
+                putStrLn $ "Grouped population " ++ (show (groupCount population_list))
+                WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount population_list
+                WS.sendTextData connection $ encode $ PopulationSummary population_summary
+                putStrLn $ "Population summary " ++ show population_summary
+                return session'
 
             _ -> do
                 putStrLn $ "Could not decode from client"
@@ -137,27 +149,12 @@ talk connection session = do
 
     where
         advance session action =
-            let
-                (Session model alts priors tosses) = session
-                sendUpdate session@(Session model alts priors tosses) = do
-                    WS.sendTextData connection $ encode $ ModelUpdate model
-                    let potential = Likely priors
-                    let population = generate_population tosses potential model
-                    let population_list = map observations_toList population
-                    let population_summary = summarizePopulation population
-                    WS.sendTextData connection $ encode $ PriorsUpdate $ priors
-                    putStrLn $ "Grouped population " ++ (show (groupCount population_list))
-                    WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount population_list
-                    WS.sendTextData connection $ encode $ PopulationSummary population_summary
-                    putStrLn $ "Population summary " ++ show population_summary
-                    return session
-            in
-            sendUpdate $ case action of
+            return $ case action of
                 AddAlternative "" -> session
                 AddPrior "" _ -> session
 
                 AddPrior alt p -> do
-                    let priors' = (Likelyhood alt (P p)) : priors
+                    let priors' = (Likelyhood alt (P p)) : (session_priors session)
                     session { session_priors = priors' }
 
                 AddAlternative alt -> do
@@ -175,13 +172,12 @@ talk connection session = do
                     session { session_tosses=tosses }
 
                 ModelChoice model_name -> do
-                    let model' = maybe model id $ lookup model_name models
-                    let session' = session {
+                    let model' = maybe (session_model session) id $ lookup model_name models
+                    session {
                           session_model = model'
                         , session_alternatives=no_potentials
                         , session_priors=no_priors
                         }
-                    session'
 
                 _ -> session
 
