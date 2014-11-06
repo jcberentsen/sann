@@ -48,14 +48,9 @@ parsePopulation v = case v of
     Json.Array vs -> Pop (map parsePopulationSet vs)
     _ -> Pop []
 
-parsePopulationSet : Json.Value -> [(Evidence, Ratio)]
+parsePopulationSet : Json.Value -> ([Evidence], Float)
 parsePopulationSet v = case v of
-    (Json.Array vs) -> map parsePopulationPair vs
-
-parsePopulationPair : Json.Value -> (Evidence, Ratio)
-parsePopulationPair v = case v of
-    (Json.Array [ev, p]) -> (Evidence (parseString ev) (parseBool p), (1, 1))
-    _ -> (Evidence "?" True, (0,0))
+    (Json.Array [Json.Array es, r]) -> (map evidenceFromArray es, parseFloat r)
 
 parsePopulationSummary : Json.Value -> [(String, Float)]
 parsePopulationSummary v = case v of

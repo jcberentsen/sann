@@ -15,6 +15,5 @@ type Potential = String
 no_potential : Potential
 no_potential = ""
 
-data Population = Pop [[(Evidence, Ratio)]]
-type Ratio = (Int, Int)
+data Population = Pop [([Evidence], Float)]
 

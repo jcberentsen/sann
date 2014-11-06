@@ -81,7 +81,7 @@ renderPotential : Potential -> Element
 renderPotential p = node green p
 
 renderPopulation : Population -> Element
-renderPopulation (Pop ps) = flow down (map (\s -> flow right (map population_node s)) ps)
+renderPopulation (Pop ps) = flow down (map (\(ev, cnt) -> flow right ((map population_node ev) ++ [(plainText (show cnt))])) ps)
 
 samplesMenu : Element
 samplesMenu = Input.dropDown samplesInput.handle (map (\n -> (show n, SampleChoice n)) [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 50, 100, 1000, 10000])
@@ -109,8 +109,8 @@ node c name =
 ignorant : Element
 ignorant = node grey "?"
 
-population_node : (Evidence, Ratio) -> Element
-population_node (Evidence e v, r) =
+population_node : Evidence -> Element
+population_node (Evidence e v) =
     let tag = node blue e
         (w,h) = sizeOf tag
         col = case v of

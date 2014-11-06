@@ -17,6 +17,7 @@ import Control.Concurrent
 import qualified Data.ByteString.Char8 as BSC
 import Data.Text (Text, empty)
 import           Data.Aeson                          (encode, decode)
+import Data.List
 
 import Data.Typeable
 import GHC.Generics
@@ -36,7 +37,7 @@ data Actions =
     | PriorsUpdate [Likelyhood Text Double]
     | ModelUpdate (CausalModel Text Bool)
     | ModelMenu [Text]
-    | PopulationUpdate [[Evidence Text Bool]]
+    | PopulationUpdate [([Evidence Text Bool], Int)]
     | PopulationSummary [(Text, PopulationRatio)]
 
 type PopulationRatio = Double
@@ -147,10 +148,11 @@ talk connection session = do
                     let priors' = (Likelyhood alt (P p)) : priors
                     let potential = Likely priors'
                     let population = generate_population tosses potential model
-                    let population_list = take 10 $ map observations_toList population
+                    let population_list = map observations_toList population
                     let population_summary = summarizePopulation population
                     WS.sendTextData connection $ encode $ PriorsUpdate $ priors'
-                    WS.sendTextData connection $ encode $ PopulationUpdate population_list
+                    putStrLn $ "Grouped population " ++ (show (groupCount population_list))
+                    WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount population_list
                     WS.sendTextData connection $ encode $ PopulationSummary population_summary
                     putStrLn $ "Population summary " ++ show population_summary
                     return $ session { session_priors = priors' }
@@ -161,15 +163,19 @@ talk connection session = do
                     let alternatively = Alternatively toggled :: Potential Text Double Bool
                     let population = generate_population tosses alternatively model
                     let population_list = take 10 $ map observations_toList population
+                    let population_summary = summarizePopulation population
                     WS.sendTextData connection $ encode $ PotentialUpdate $ toggled
-                    WS.sendTextData connection $ encode $ PopulationUpdate population_list
+                    WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount population_list
+                    WS.sendTextData connection $ encode $ PopulationSummary population_summary
                     return $ session { session_alternatives = toggled }
 
                 SampleChoice tosses -> do
                     putStrLn $ show action
-                    let alternatively = Alternatively alts :: Potential Text Double Bool
-                    let population = generate_population tosses alternatively model
-                    WS.sendTextData connection $ encode $ PopulationUpdate $ take 10 $ (map observations_toList population)
+                    --let alternatively = Alternatively alts :: Potential Text Double Bool
+                    let population = generate_population tosses (Likely priors)model
+                    let population_summary = summarizePopulation population
+                    WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount (map observations_toList population)
+                    WS.sendTextData connection $ encode $ PopulationSummary population_summary
                     return $ session { session_tosses=tosses }
 
                 ModelChoice model_name -> do
@@ -181,9 +187,14 @@ talk connection session = do
                         , session_priors=no_priors
                         }
                     WS.sendTextData connection $ encode $ ModelUpdate model'
+                    WS.sendTextData connection $ encode $ PriorsUpdate $ no_priors
                     WS.sendTextData connection $ encode $ PotentialUpdate $ no_potentials
-                    WS.sendTextData connection $ encode $ PopulationUpdate $ no_population
+                    WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount no_population
+                    WS.sendTextData connection $ encode $ PopulationSummary []
                     return $ session'
 
                 _ -> return session
 
+groupCount :: (Eq a, Ord a) => [a] -> [(a, Int)]
+groupCount as = map (\gs@(g:_) -> (g, length gs)) (group sorted)
+    where sorted = sort as
