@@ -147,11 +147,12 @@ talk connection session = do
                     let priors' = (Likelyhood alt (P p)) : priors
                     let potential = Likely priors'
                     let population = generate_population tosses potential model
-                    let population_list = map observations_toList population
-                    let population_summary = summarizeObservations population --[("rain", 0.2)]
+                    let population_list = take 10 $ map observations_toList population
+                    let population_summary = summarizePopulation population
                     WS.sendTextData connection $ encode $ PriorsUpdate $ priors'
                     WS.sendTextData connection $ encode $ PopulationUpdate population_list
                     WS.sendTextData connection $ encode $ PopulationSummary population_summary
+                    putStrLn $ "Population summary " ++ show population_summary
                     return $ session { session_priors = priors' }
 
                 AddAlternative alt -> do
@@ -159,7 +160,7 @@ talk connection session = do
                     let toggled = toggle_alternative (fact alt) alts
                     let alternatively = Alternatively toggled :: Potential Text Double Bool
                     let population = generate_population tosses alternatively model
-                    let population_list = map observations_toList population
+                    let population_list = take 10 $ map observations_toList population
                     WS.sendTextData connection $ encode $ PotentialUpdate $ toggled
                     WS.sendTextData connection $ encode $ PopulationUpdate population_list
                     return $ session { session_alternatives = toggled }
@@ -168,7 +169,7 @@ talk connection session = do
                     putStrLn $ show action
                     let alternatively = Alternatively alts :: Potential Text Double Bool
                     let population = generate_population tosses alternatively model
-                    WS.sendTextData connection $ encode $ PopulationUpdate $ (map observations_toList population)
+                    WS.sendTextData connection $ encode $ PopulationUpdate $ take 10 $ (map observations_toList population)
                     return $ session { session_tosses=tosses }
 
                 ModelChoice model_name -> do

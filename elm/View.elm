@@ -63,7 +63,7 @@ pieSlice : Float -> Color -> Float -> (Element, Float) -> [Form]
 pieSlice radius colr offset (node, angle) =
     let makePoint t = fromPolar (radius, degrees (180 - 360 * offset - t))
     in  [ filled colr << polygon <| (0,0) :: map makePoint [0 .. 360 * angle]
-        , toForm (flow down [node, (asPercent angle)])
+        , toForm (flow down [node, (plainText <| show angle)])
             |> move (fromPolar (radius*0.7, turns (0.5 - (offset + angle/2))))
         ]
 
