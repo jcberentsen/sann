@@ -137,63 +137,53 @@ talk connection session = do
 
     where
         advance session action =
-            let (Session model alts priors tosses) = session
-            in
-            case action of
-                AddAlternative "" -> return session
-                AddPrior "" _ -> return session
-
-                AddPrior alt p -> do
-                    putStrLn $ show action
-                    let priors' = (Likelyhood alt (P p)) : priors
-                    let potential = Likely priors'
+            let
+                (Session model alts priors tosses) = session
+                sendUpdate session@(Session model alts priors tosses) = do
+                    WS.sendTextData connection $ encode $ ModelUpdate model
+                    let potential = Likely priors
                     let population = generate_population tosses potential model
                     let population_list = map observations_toList population
                     let population_summary = summarizePopulation population
-                    WS.sendTextData connection $ encode $ PriorsUpdate $ priors'
+                    WS.sendTextData connection $ encode $ PriorsUpdate $ priors
                     putStrLn $ "Grouped population " ++ (show (groupCount population_list))
                     WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount population_list
                     WS.sendTextData connection $ encode $ PopulationSummary population_summary
                     putStrLn $ "Population summary " ++ show population_summary
-                    return $ session { session_priors = priors' }
+                    return session
+            in
+            sendUpdate $ case action of
+                AddAlternative "" -> session
+                AddPrior "" _ -> session
+
+                AddPrior alt p -> do
+                    let priors' = (Likelyhood alt (P p)) : priors
+                    session { session_priors = priors' }
 
                 AddAlternative alt -> do
-                    putStrLn $ show action
-                    let toggled = toggle_alternative (fact alt) alts
-                    let alternatively = Alternatively toggled :: Potential Text Double Bool
-                    let population = generate_population tosses alternatively model
-                    let population_list = take 10 $ map observations_toList population
-                    let population_summary = summarizePopulation population
-                    WS.sendTextData connection $ encode $ PotentialUpdate $ toggled
-                    WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount population_list
-                    WS.sendTextData connection $ encode $ PopulationSummary population_summary
-                    return $ session { session_alternatives = toggled }
+                    --let toggled = toggle_alternative (fact alt) alts
+                    --let alternatively = Alternatively toggled :: Potential Text Double Bool
+                    --let population = generate_population tosses alternatively model
+                    --let population_list = take 10 $ map observations_toList population
+                    --let population_summary = summarizePopulation population
+                    --WS.sendTextData connection $ encode $ PotentialUpdate $ toggled
+                    --WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount population_list
+                    --WS.sendTextData connection $ encode $ PopulationSummary population_summary
+                    session --{ session_alternatives = toggled }
 
                 SampleChoice tosses -> do
-                    putStrLn $ show action
-                    --let alternatively = Alternatively alts :: Potential Text Double Bool
-                    let population = generate_population tosses (Likely priors)model
-                    let population_summary = summarizePopulation population
-                    WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount (map observations_toList population)
-                    WS.sendTextData connection $ encode $ PopulationSummary population_summary
-                    return $ session { session_tosses=tosses }
+                    session { session_tosses=tosses }
 
                 ModelChoice model_name -> do
-                    putStrLn $ show action
                     let model' = maybe model id $ lookup model_name models
                     let session' = session {
                           session_model = model'
                         , session_alternatives=no_potentials
                         , session_priors=no_priors
                         }
-                    WS.sendTextData connection $ encode $ ModelUpdate model'
-                    WS.sendTextData connection $ encode $ PriorsUpdate $ no_priors
-                    WS.sendTextData connection $ encode $ PotentialUpdate $ no_potentials
-                    WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount no_population
-                    WS.sendTextData connection $ encode $ PopulationSummary []
-                    return $ session'
+                    session'
 
-                _ -> return session
+                _ -> session
 
 groupCount :: (Eq a, Ord a) => [a] -> [(a, Int)]
 groupCount as = map (\gs@(g:_) -> (g, length gs)) (group sorted)
