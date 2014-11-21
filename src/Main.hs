@@ -17,7 +17,6 @@ import Control.Concurrent
 import qualified Data.ByteString.Char8 as BSC
 import Data.Text (Text, empty)
 import           Data.Aeson                          (encode, decode)
-import Data.List
 
 import Data.Typeable
 import GHC.Generics
@@ -106,7 +105,6 @@ models =
     , ("MontyHall stay", staying_game)
     , ("MontyHall switch", switching_game)
     , ("green eyes", devo)
-    , ("devo brown eyes", devo_brown)
     ]
 
 modelMenu :: Actions
@@ -134,10 +132,8 @@ talk connection session = do
                 let population_list = map observations_toList population
                 let population_summary = summarizePopulation population
                 WS.sendTextData connection $ encode $ PriorsUpdate $ priors
-                putStrLn $ "Grouped population " ++ (show (groupCount population_list))
                 WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount population_list
                 WS.sendTextData connection $ encode $ PopulationSummary population_summary
-                putStrLn $ "Population summary " ++ show population_summary
                 return session'
 
             _ -> do
@@ -158,15 +154,7 @@ talk connection session = do
                     session { session_priors = priors' }
 
                 AddAlternative alt -> do
-                    --let toggled = toggle_alternative (fact alt) alts
-                    --let alternatively = Alternatively toggled :: Potential Text Double Bool
-                    --let population = generate_population tosses alternatively model
-                    --let population_list = take 10 $ map observations_toList population
-                    --let population_summary = summarizePopulation population
-                    --WS.sendTextData connection $ encode $ PotentialUpdate $ toggled
-                    --WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount population_list
-                    --WS.sendTextData connection $ encode $ PopulationSummary population_summary
-                    session --{ session_alternatives = toggled }
+                    session
 
                 SampleChoice tosses -> do
                     session { session_tosses=tosses }
@@ -180,7 +168,3 @@ talk connection session = do
                         }
 
                 _ -> session
-
-groupCount :: (Eq a, Ord a) => [a] -> [(a, Int)]
-groupCount as = map (\gs@(g:_) -> (g, length gs)) (group sorted)
-    where sorted = sort as
