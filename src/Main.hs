@@ -9,27 +9,25 @@
 
 module Main where
 
-import Snap
-import qualified Network.WebSockets.Snap as WSS
-import qualified Network.WebSockets as WS
-import Control.Concurrent
-
-import qualified Data.ByteString.Char8 as BSC
-import Data.Text (Text, empty)
-import           Data.Aeson                          (encode, decode)
-
-import Data.Typeable
-import GHC.Generics
-import Data.Aeson.TH
-
-import Examples.MontyHall
-import Examples.DihybridCross
-
 import Model
 import Evidence
 import Likelyhood
 import Population
 import Observations
+
+import Examples.MontyHall
+import Examples.DihybridCross
+
+import Snap
+import qualified Network.WebSockets.Snap as WSS
+import qualified Network.WebSockets as WS
+
+import Data.Text (Text)
+import           Data.Aeson                          (encode, decode)
+import Data.Maybe
+import Data.List (foldl')
+
+import Data.Aeson.TH
 
 data Actions =
       PotentialUpdate (Alternatives Text Bool)
@@ -44,10 +42,10 @@ type PopulationRatio = Double
 $(deriveToJSON defaultOptions ''Actions)
 
 data Session = Session
-    { session_model :: CausalModel Text Bool
-    , session_alternatives :: Alternatives Text Bool
-    , session_priors :: [Likelyhood Text Double]
-    , session_tosses :: Int
+    { sessionModel :: CausalModel Text Bool
+    , sessionAlternatives :: Alternatives Text Bool
+    , sessionPriors :: [Likelyhood Text Double]
+    , sessionTosses :: Int
     }
 
 data ServerAction
@@ -60,20 +58,21 @@ data ServerAction
 
 $(deriveJSON defaultOptions ''ServerAction)
 
-multi_model :: CausalModel Text Bool
-multi_model = Multiple [rain_or_sprinklers, wet_causes_slippery]
+multiModel :: CausalModel Text Bool
+multiModel = Multiple [rainOrSprinklers, wetCausesSlippery]
 
-rain_or_sprinklers :: CausalModel Text Bool
-rain_or_sprinklers = AnyCause [rain, fact "sprinklers"] wet
+rainOrSprinklers :: CausalModel Text Bool
+rainOrSprinklers = AnyCause [rain, fact "sprinklers"] wet
 
-wet_causes_slippery :: CausalModel Text Bool
-wet_causes_slippery = Causally (wet) (fact "slippery")
+wetCausesSlippery :: CausalModel Text Bool
+wetCausesSlippery = Causally wet (fact "slippery")
 
-rain = fact "rain"
+rain, wet :: Evidence Text Bool
+rain = fact "rain" :: Evidence Text Bool
 wet = fact "wet"
 
-no_population :: [[Evidence Text Bool]]
-no_population = []
+noPopulation :: [[Evidence Text Bool]]
+noPopulation = []
 
 site :: Snap ()
 site = writeText "Connect the 'ShowCause.elm' client to 'Sann'!"
@@ -93,17 +92,17 @@ main =
 socket :: Snap ()
 socket = WSS.runWebSocketsSnap wsApp
 
-no_potentials :: Alternatives Text Bool
-no_potentials = Alternatives []
+noPotentials :: Alternatives Text Bool
+noPotentials = Alternatives []
 
-no_priors = [] :: [Likelyhood Text Double]
---no_priors = [Likelyhood "rain" (P 0.5), Likelyhood "sprinklers" (P 0.1)] :: [Likelyhood Text Float]
+noPriors :: [Likelyhood Text Double]
+noPriors = []
 
 models :: [(Text, CausalModel Text Bool)]
 models =
-    [ ("weather", multi_model)
-    , ("MontyHall stay", staying_game)
-    , ("MontyHall switch", switching_game)
+    [ ("weather", multiModel)
+    , ("MontyHall stay", stayingGame)
+    , ("MontyHall switch", switchingGame)
     , ("green eyes", devo)
     ]
 
@@ -114,9 +113,9 @@ wsApp :: WS.ServerApp
 wsApp pendingConnection = do
     connection <- WS.acceptRequest pendingConnection
     WS.sendTextData connection $ encode modelMenu
-    WS.sendTextData connection $ encode $ ModelUpdate multi_model
-    let initial_session = Session multi_model no_potentials no_priors 2
-    talk connection initial_session
+    WS.sendTextData connection $ encode $ ModelUpdate multiModel
+    let initialSession = Session multiModel noPotentials noPriors 2
+    talk connection initialSession
 
 talk :: WS.Connection -> Session -> IO ()
 talk connection session = do
@@ -125,46 +124,44 @@ talk connection session = do
     session' <-
         case decoded of
             Just actions -> do
-                session'@(Session model alts priors tosses) <- foldM advance session actions
+                let session'@(Session model _alts priors tosses) = foldl' advance session actions
                 WS.sendTextData connection $ encode $ ModelUpdate model
                 let potential = Likely priors
-                let population = generate_population tosses potential model
-                let population_list = map observations_toList population
-                let population_summary = summarizePopulation population
-                WS.sendTextData connection $ encode $ PriorsUpdate $ priors
-                WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount population_list
-                WS.sendTextData connection $ encode $ PopulationSummary population_summary
+                let population = generatePopulation tosses potential model
+                let populationList = map observationsToList population
+                let populationSummary = summarizePopulation population
+                WS.sendTextData connection $ encode $ PriorsUpdate priors
+                WS.sendTextData connection $ encode $ PopulationUpdate $ groupCount populationList
+                WS.sendTextData connection $ encode $ PopulationSummary populationSummary
                 return session'
 
             _ -> do
-                putStrLn $ "Could not decode from client"
-                putStrLn $ show msg
+                putStrLn "Could not decode from client"
+                print msg
                 return session
 
     talk connection session'
 
     where
-        advance session action =
-            return $ case action of
-                AddAlternative "" -> session
-                AddPrior "" _ -> session
+        advance s action =
+            case action of
+                AddAlternative "" -> s
+                AddPrior "" _ -> s
 
                 AddPrior alt p -> do
-                    let priors' = (Likelyhood alt (P p)) : (session_priors session)
-                    session { session_priors = priors' }
+                    let priors' = Likelyhood alt (P p) : sessionPriors session
+                    s { sessionPriors = priors' }
 
-                AddAlternative alt -> do
-                    session
+                AddAlternative _ -> s
 
-                SampleChoice tosses -> do
-                    session { session_tosses=tosses }
+                SampleChoice tosses -> s { sessionTosses=tosses }
 
-                ModelChoice model_name -> do
-                    let model' = maybe (session_model session) id $ lookup model_name models
-                    session {
-                          session_model = model'
-                        , session_alternatives=no_potentials
-                        , session_priors=no_priors
+                ModelChoice modelName -> do
+                    let model' = fromMaybe (sessionModel s) $ lookup modelName models
+                    s {
+                          sessionModel = model'
+                        , sessionAlternatives = noPotentials
+                        , sessionPriors = noPriors
                         }
 
-                _ -> session
+                _ -> s
